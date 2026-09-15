@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1035539627021",
+    "project_id": "baycel-grocery-store",
+    "storage_bucket": "baycel-grocery-store.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1035539627021:android:c4175d5c2bf1b7dfb7a944",
+        "android_client_info": {
+          "package_name": "com.example.baycel_grocery"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCB0ybHN6qL4uuaNvazZ_vhsEhumV0MknA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,27 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "baycel-grocery-store",
+          "appId": "1:1035539627021:android:c4175d5c2bf1b7dfb7a944",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "baycel-grocery-store",
+          "configurations": {
+            "android": "1:1035539627021:android:c4175d5c2bf1b7dfb7a944",
+            "ios": "1:1035539627021:ios:06b7dca0315979f5b7a944",
+            "web": "1:1035539627021:web:8c4fa0743346e6ecb7a944",
+            "windows": "1:1035539627021:web:769da1c41c0e20e7b7a944"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "indexes": "firestore.indexes.json"
+  }
+}
