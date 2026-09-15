@@ -59,3 +59,7 @@ UIsamples-for-all-dashboard/
 docs/DESIGN.md
 docs/PRODUCT.md
 docs/Baycel-System-Workflow.md
+
+# Firebase (API keys - regenerate with flutterfire configure)
+android/app/google-services.json
+lib/firebase_options.dart
