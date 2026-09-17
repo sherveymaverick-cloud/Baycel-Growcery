@@ -47,19 +47,7 @@ app.*.map.json
 # Widget Preview related
 .widget_preview/
 
-# OpenCode & Impeccable
-.opencode/
-.impeccable/
-.agents/
-
-# UI Samples
-UIsamples-for-all-dashboard/
-
-# Plan/design docs (keep README.md)
-docs/DESIGN.md
-docs/PRODUCT.md
-docs/Baycel-System-Workflow.md
-
-# Firebase (API keys - regenerate with flutterfire configure)
-android/app/google-services.json
-lib/firebase_options.dart
+# Firebase config (contains API keys)
+**/google-services.json
+**/GoogleService-Info.plist
+**/firebase_options.dart

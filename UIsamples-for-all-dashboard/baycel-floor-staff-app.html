@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Baycel Growcery — Floor Staff</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --crimson:#C62828; --crimson-light:#EF5350; --crimson-dark:#8E0000;
+    --marigold:#FEB300; --marigold-dark:#F57F17;
+    --blue:#006AB8;
+    --surface:#F8F9FA; --card:#FFFFFF;
+    --text-primary:#1C1B1F; --text-secondary:#5B403D; --text-muted:#616161; --text-disabled:#9E9E9E;
+    --divider:#E0E0E0;
+    --error:#BA1A1A; --success:#2E7D32;
+    --r-sm:2px; --r-md:4px; --r-lg:8px; --r-xl:12px; --r-full:9999px;
+    --shadow-sm:0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md:0 4px 12px rgba(28,27,31,0.08);
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; font-family:'Inter',system-ui,sans-serif; background:#EDEEF0; color:var(--text-primary); -webkit-font-smoothing:antialiased; }
+  .tabular{ font-variant-numeric: tabular-nums; }
+  p{ margin:0; }
+
+  .demo-bar{ background:var(--card); border-bottom:1px solid var(--divider); padding:10px 14px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap; position:sticky; top:0; z-index:20; }
+  .demo-chip{ font-size:11.5px; font-weight:600; padding:7px 13px; border-radius:var(--r-full); border:1px solid var(--divider); background:transparent; color:var(--text-primary); cursor:pointer; font-family:inherit; }
+  .demo-chip.selected{ background:var(--crimson); border-color:var(--crimson); color:#fff; }
+
+  .frame{ max-width:420px; margin:0 auto; min-height:calc(100vh - 45px); background:var(--surface); box-shadow:0 0 24px rgba(0,0,0,0.05); position:relative; }
+
+  .app-bar{ background:linear-gradient(135deg, var(--crimson) 0%, var(--crimson-dark) 100%); color:#fff; padding:20px 18px 28px; border-radius:0 0 18px 18px; }
+  .app-bar-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .app-bar-brand{ display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; }
+  .app-bar-brand svg{ width:18px; height:18px; }
+  .bell{ width:32px; height:32px; border-radius:var(--r-full); background:rgba(255,255,255,0.18); display:flex; align-items:center; justify-content:center; position:relative; }
+  .bell svg{ width:15px; height:15px; }
+  .bell .dot{ position:absolute; top:6px; right:6px; width:6px; height:6px; border-radius:var(--r-full); background:var(--marigold); border:1.5px solid var(--crimson-dark); }
+  .app-greeting{ font-size:19px; font-weight:700; letter-spacing:-0.01em; }
+  .app-role{ font-size:12px; opacity:0.85; margin-top:2px; }
+
+  .content{ padding:16px 16px 32px; margin-top:-16px; }
+  .rpage{ display:none; flex-direction:column; gap:14px; }
+  .rpage.active{ display:flex; }
+
+  .page-title-row{ margin-bottom:2px; }
+  .page-title-row .t{ font-size:16px; font-weight:700; }
+  .page-title-row .s{ font-size:11.5px; color:var(--text-muted); margin-top:2px; }
+
+  .card{ background:var(--card); border:1px solid rgba(224,224,224,0.5); border-radius:var(--r-lg); box-shadow:var(--shadow-sm); padding:16px; }
+  .card-title{ font-size:14px; font-weight:600; margin-bottom:2px; }
+  .card-sub{ font-size:11.5px; color:var(--text-muted); margin-bottom:12px; }
+
+  .clock-card{ display:flex; align-items:center; gap:14px; }
+  .clock-ring{ width:56px; height:56px; border-radius:var(--r-full); background:rgba(46,125,50,0.1); display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background 160ms ease; }
+  .clock-ring svg{ width:26px; height:26px; }
+  .clock-status{ font-size:13px; font-weight:600; }
+  .clock-time{ font-size:11.5px; color:var(--text-muted); margin-top:2px; }
+  .clock-btn{ margin-left:auto; min-width:88px; }
+
+  .btn{ font-family:inherit; font-size:12.5px; font-weight:600; border-radius:var(--r-md); padding:10px 18px; cursor:pointer; border:none; display:inline-flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; }
+  .btn svg{ width:14px; height:14px; }
+  .btn-primary{ background:var(--crimson); color:#fff; }
+  .btn-outlined{ background:transparent; color:var(--text-primary); border:1px solid var(--divider); }
+  .btn-block{ width:100%; }
+  .btn-sm{ padding:7px 12px; font-size:11.5px; }
+
+  .field-group{ margin-bottom:12px; }
+  .field-label{ font-size:11px; font-weight:500; color:var(--text-muted); letter-spacing:0.03em; margin-bottom:5px; display:block; }
+  .field-input, select.field-input{ width:100%; background:var(--card); border:1px solid var(--divider); border-radius:var(--r-md); padding:10px 12px; font-family:inherit; font-size:13px; color:var(--text-primary); outline:none; }
+  .field-input:focus{ border-color:var(--crimson); border-width:2px; padding:9px 11px; }
+  .field-input[disabled]{ color:var(--text-muted); background:var(--surface); }
+
+  .pill{ display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:600; padding:3px 9px; border-radius:var(--r-full); white-space:nowrap; }
+  .pill-dot{ width:5px; height:5px; border-radius:var(--r-full); }
+  .pill-green{ background:rgba(46,125,50,0.12); color:var(--success); }
+  .pill-green .pill-dot{ background:var(--success); }
+  .pill-amber{ background:rgba(254,179,0,0.18); color:var(--marigold-dark); }
+  .pill-amber .pill-dot{ background:var(--marigold-dark); }
+  .pill-red{ background:rgba(198,40,40,0.1); color:var(--crimson-dark); }
+  .pill-red .pill-dot{ background:var(--crimson); }
+  .pill-grey{ background:var(--surface); color:var(--text-muted); }
+  .pill-grey .pill-dot{ background:var(--text-disabled); }
+
+  .list-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid rgba(224,224,224,0.6); }
+  .list-row:last-child{ border-bottom:none; }
+  .list-icon{ width:32px; height:32px; border-radius:var(--r-lg); background:var(--surface); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .list-icon svg{ width:15px; height:15px; color:var(--text-secondary); }
+  .list-title{ font-size:12.5px; font-weight:600; }
+  .list-meta{ font-size:11px; color:var(--text-muted); margin-top:1px; }
+  .list-value{ margin-left:auto; font-size:12px; font-weight:600; }
+
+  .stat-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .stat-box{ background:var(--card); border:1px solid rgba(224,224,224,0.5); border-radius:var(--r-lg); box-shadow:var(--shadow-sm); padding:12px; text-align:center; }
+  .stat-box-value{ font-size:17px; font-weight:700; }
+  .stat-box-label{ font-size:10px; color:var(--text-muted); margin-top:2px; }
+
+  .action-row{ display:flex; align-items:center; gap:10px; }
+  .qty-input{ width:64px; text-align:center; }
+
+  .footer-nav{ display:flex; justify-content:space-around; padding:10px 0 6px; border-top:1px solid var(--divider); background:var(--card); position:sticky; bottom:0; }
+  .fn-item{ display:flex; flex-direction:column; align-items:center; gap:2px; font-size:9.5px; font-weight:600; color:var(--text-disabled); cursor:pointer; background:none; border:none; font-family:inherit; padding:2px 6px; }
+  .fn-item.active{ color:var(--crimson); }
+  .fn-item svg{ width:19px; height:19px; }
+
+  .toast{ position:absolute; left:50%; bottom:78px; transform:translate(-50%,10px); background:#1C1B1F; color:#fff; font-size:12px; font-weight:600; padding:10px 16px; border-radius:8px; opacity:0; pointer-events:none; transition:all 200ms ease; z-index:50; max-width:320px; text-align:center; }
+  .toast.show{ opacity:1; transform:translate(-50%,0); }
+</style>
+</head>
+<body>
+
+<div class="demo-bar" id="roleSwitcher">
+  <button class="demo-chip selected" data-role="cashier">Cashier</button>
+  <button class="demo-chip" data-role="bagger">Bagger</button>
+  <button class="demo-chip" data-role="bodegero">Bodegero</button>
+  <button class="demo-chip" data-role="deliverychecker">Delivery Checker</button>
+  <button class="demo-chip" data-role="merchandiser">Merchandiser</button>
+</div>
+
+<div class="frame" id="frame">
+
+  <!-- ================= CASHIER ================= -->
+  <div class="role-view" id="role-cashier">
+    <div class="app-bar">
+      <div class="app-bar-top">
+        <div class="app-bar-brand"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 12.2a2 2 0 0 0 2 1.6h8.4a2 2 0 0 0 2-1.6L21.5 8H6.5"/></svg>Baycel Growcery</div>
+        <div class="bell"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/></svg><span class="dot"></span></div>
+      </div>
+      <p class="app-greeting">Hi, Mika</p>
+      <p class="app-role">Cashier · Counter 2</p>
+    </div>
+    <div class="content">
+
+      <div class="rpage active" id="cashier-page-home">
+        <div class="card clock-card">
+          <div class="clock-ring" id="cashierRing"><svg viewBox="0 0 24 24" fill="none" stroke="#2E7D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg></div>
+          <div><p class="clock-status" id="cashierStatus">Clocked in</p><p class="clock-time tabular" id="cashierTime">Since 7:55 AM</p></div>
+          <button class="btn btn-primary clock-btn" id="cashierClockBtn" onclick="toggleClock('cashier')">Time Out</button>
+        </div>
+
+        <div class="card">
+          <p class="card-title">Submit Sales Counter</p>
+          <p class="card-sub">Record today's total for your shift</p>
+          <div class="field-group"><label class="field-label">Date</label><input class="field-input" value="Sep 10, 2026" disabled/></div>
+          <div class="field-group"><label class="field-label">Shift</label>
+            <select class="field-input" id="cashierShift"><option>Morning (7AM–3PM)</option><option>Afternoon (3PM–11PM)</option></select>
+          </div>
+          <div class="field-group"><label class="field-label">Total Sales (₱)</label><input class="field-input" id="cashierSales" placeholder="0.00"/></div>
+          <button class="btn btn-primary btn-block" onclick="submitCounter()">Submit Counter Record</button>
+        </div>
+
+        <div class="card">
+          <p class="card-title">Recent Submissions</p>
+          <div id="cashierSubmissions">
+            <div class="list-row"><div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div><p class="list-title">Sep 9 · Morning shift</p><p class="list-meta">Submitted 3:02 PM</p></div><span class="list-value tabular">₱14,230</span></div>
+            <div class="list-row"><div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div><p class="list-title">Sep 8 · Morning shift</p><p class="list-meta">Submitted 3:10 PM</p></div><span class="list-value tabular">₱12,880</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rpage" id="cashier-page-attendance">
+        <div class="page-title-row"><p class="t">My Attendance</p><p class="s">This week's summary and daily log</p></div>
+        <div class="stat-row">
+          <div class="stat-box"><p class="stat-box-value tabular">5</p><p class="stat-box-label">Days Present</p></div>
+          <div class="stat-box"><p class="stat-box-value tabular">0</p><p class="stat-box-label">Late</p></div>
+          <div class="stat-box"><p class="stat-box-value tabular">44.2</p><p class="stat-box-label">Total Hrs</p></div>
+        </div>
+        <div class="card">
+          <p class="card-title">Daily Log</p>
+          <div class="list-row"><div><p class="list-title">Mon, Sep 8</p><p class="list-meta tabular">7:55 AM – 4:58 PM</p></div><span class="pill pill-green" style="margin-left:auto;"><span class="pill-dot"></span>On Time</span></div>
+          <div class="list-row"><div><p class="list-title">Tue, Sep 9</p><p class="list-meta tabular">7:52 AM – 5:01 PM</p></div><span class="pill pill-green" style="margin-left:auto;"><span class="pill-dot"></span>On Time</span></div>
+          <div class="list-row"><div><p class="list-title">Wed, Sep 10</p><p class="list-meta tabular">7:55 AM – 4:58 PM</p></div><span class="pill pill-green" style="margin-left:auto;"><span class="pill-dot"></span>On Time</span></div>
+        </div>
+      </div>
+
+      <div class="rpage" id="cashier-page-profile">
+        <div class="page-title-row"><p class="t">My Profile</p></div>
+        <div class="card">
+          <p class="card-title">Personal Info</p>
+          <div class="field-group"><label class="field-label">Full Name</label><input class="field-input" value="Mika Cruz" disabled/></div>
+          <div class="field-group"><label class="field-label">Role</label><input class="field-input" value="Cashier" disabled/></div>
+          <div class="field-group"><label class="field-label">Contact Number</label><input class="field-input" value="0918 335 2290"/></div>
+          <button class="btn btn-primary">Save Changes</button>
+        </div>
+        <div class="card">
+          <p class="card-title">Security</p>
+          <div class="field-group"><label class="field-label">Current Password</label><input class="field-input" type="password" value="••••••••"/></div>
+          <div class="field-group"><label class="field-label">New Password</label><input class="field-input" type="password" placeholder="Enter new password"/></div>
+          <button class="btn btn-outlined btn-block">Update Password</button>
+        </div>
+      </div>
+
+    </div>
+    <div class="footer-nav">
+      <button class="fn-item active" data-page="home" onclick="showRolePage('cashier','home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Home</button>
+      <button class="fn-item" data-page="attendance" onclick="showRolePage('cashier','attendance')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg>Attendance</button>
+      <button class="fn-item" data-page="profile" onclick="showRolePage('cashier','profile')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>Me</button>
+    </div>
+  </div>
+
+  <!-- ================= BAGGER ================= -->
+  <div class="role-view" id="role-bagger" style="display:none;">
+    <div class="app-bar">
+      <div class="app-bar-top">
+        <div class="app-bar-brand"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 12.2a2 2 0 0 0 2 1.6h8.4a2 2 0 0 0 2-1.6L21.5 8H6.5"/></svg>Baycel Growcery</div>
+        <div class="bell"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/></svg></div>
+      </div>
+      <p class="app-greeting">Hi, Ben</p>
+      <p class="app-role">Bagger</p>
+    </div>
+    <div class="content">
+
+      <div class="rpage active" id="bagger-page-home">
+        <div class="card clock-card">
+          <div class="clock-ring" id="baggerRing" style="background:rgba(0,106,184,0.1);"><svg viewBox="0 0 24 24" fill="none" stroke="#006AB8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg></div>
+          <div><p class="clock-status" id="baggerStatus">Not clocked in</p><p class="clock-time" id="baggerTime">Tap to start your shift</p></div>
+          <button class="btn btn-primary clock-btn" id="baggerClockBtn" onclick="toggleClock('bagger')">Time In</button>
+        </div>
+
+        <div class="card">
+          <p class="card-title">Submit Absence Form</p>
+          <p class="card-sub">Requests are reviewed by your Manager</p>
+          <div class="field-group"><label class="field-label">Date(s)</label><input class="field-input" id="baggerDate" placeholder="e.g. Sep 15–16, 2026"/></div>
+          <div class="field-group"><label class="field-label">Reason</label><input class="field-input" id="baggerReason" placeholder="Brief reason for absence"/></div>
+          <button class="btn btn-primary btn-block" onclick="submitAbsence()">Submit Request</button>
+        </div>
+
+        <div class="card">
+          <p class="card-title">My Absence Requests</p>
+          <div id="baggerRequests">
+            <div class="list-row"><div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div><div><p class="list-title">Aug 28 · Family emergency</p><p class="list-meta">Submitted Aug 27</p></div><span class="pill pill-green"><span class="pill-dot"></span>Approved</span></div>
+            <div class="list-row"><div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div><div><p class="list-title">Sep 15–16 · Medical</p><p class="list-meta">Submitted Sep 10</p></div><span class="pill pill-amber"><span class="pill-dot"></span>Pending</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rpage" id="bagger-page-attendance">
+        <div class="page-title-row"><p class="t">My Attendance</p><p class="s">This week's summary and daily log</p></div>
+        <div class="stat-row">
+          <div class="stat-box"><p class="stat-box-value tabular">4</p><p class="stat-box-label">Days Present</p></div>
+          <div class="stat-box"><p class="stat-box-value tabular">1</p><p class="stat-box-label">Late</p></div>
+          <div class="stat-box"><p class="stat-box-value tabular">35.6</p><p class="stat-box-label">Total Hrs</p></div>
+        </div>
+        <div class="card">
+          <p class="card-title">Daily Log</p>
+          <div class="list-row"><div><p class="list-title">Mon, Sep 8</p><p class="list-meta tabular">8:20 AM – 5:00 PM</p></div><span class="pill pill-amber" style="margin-left:auto;"><span class="pill-dot"></span>Late 20m</span></div>
+          <div class="list-row"><div><p class="list-title">Tue, Sep 9</p><p class="list-meta tabular">7:58 AM – 5:02 PM</p></div><span class="pill pill-green" style="margin-left:auto;"><span class="pill-dot"></span>On Time</span></div>
+          <div class="list-row"><div><p class="list-title">Wed, Sep 10</p><p class="list-meta tabular">8:20 AM – In Progress</p></div><span class="pill pill-grey" style="margin-left:auto;"><span class="pill-dot"></span>Ongoing</span></div>
+        </div>
+      </div>
+
+      <div class="rpage" id="bagger-page-profile">
+        <div class="page-title-row"><p class="t">My Profile</p></div>
+        <div class="card">
+          <p class="card-title">Personal Info</p>
+          <div class="field-group"><label class="field-label">Full Name</label><input class="field-input" value="Ben Torres" disabled/></div>
+          <div class="field-group"><label class="field-label">Role</label><input class="field-input" value="Bagger" disabled/></div>
+          <div class="field-group"><label class="field-label">Contact Number</label><input class="field-input" value="0920 118 7734"/></div>
+          <button class="btn btn-primary">Save Changes</button>
+        </div>
+        <div class="card">
+          <p class="card-title">Security</p>
+          <div class="field-group"><label class="field-label">Current Password</label><input class="field-input" type="password" value="••••••••"/></div>
+          <div class="field-group"><label class="field-label">New Password</label><input class="field-input" type="password" placeholder="Enter new password"/></div>
+          <button class="btn btn-outlined btn-block">Update Password</button>
+        </div>
+      </div>
+
+    </div>
+    <div class="footer-nav">
+      <button class="fn-item active" data-page="home" onclick="showRolePage('bagger','home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Home</button>
+      <button class="fn-item" data-page="attendance" onclick="showRolePage('bagger','attendance')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg>Attendance</button>
+      <button class="fn-item" data-page="profile" onclick="showRolePage('bagger','profile')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>Me</button>
+    </div>
+  </div>
+
+  <!-- ================= BODEGERO ================= -->
+  <div class="role-view" id="role-bodegero" style="display:none;">
+    <div class="app-bar">
+      <div class="app-bar-top">
+        <div class="app-bar-brand"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 12.2a2 2 0 0 0 2 1.6h8.4a2 2 0 0 0 2-1.6L21.5 8H6.5"/></svg>Baycel Growcery</div>
+        <div class="bell"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/></svg><span class="dot"></span></div>
+      </div>
+      <p class="app-greeting">Hi, Rico</p>
+      <p class="app-role">Bodegero · Stockroom</p>
+    </div>
+    <div class="content">
+
+      <div class="rpage active" id="bodegero-page-home">
+        <div class="card clock-card">
+          <div class="clock-ring" id="bodegeroRing"><svg viewBox="0 0 24 24" fill="none" stroke="#2E7D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg></div>
+          <div><p class="clock-status" id="bodegeroStatus">Clocked in</p><p class="clock-time tabular" id="bodegeroTime">Since 7:58 AM</p></div>
+          <button class="btn btn-primary clock-btn" id="bodegeroClockBtn" onclick="toggleClock('bodegero')">Time Out</button>
+        </div>
+        <div class="card">
+          <p class="card-title">Today's Summary</p>
+          <div class="list-row"><div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="6" width="15" height="12" rx="1.5"/></svg></div><div><p class="list-title">1 delivery awaiting stock-in</p><p class="list-meta">Coldline Dairy &amp; Frozen</p></div><span class="pill pill-amber" style="margin-left:auto;"><span class="pill-dot"></span>Pending</span></div>
+          <div class="list-row"><div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div><p class="list-title">1 transfer logged today</p><p class="list-meta">Cooking Oil 1L to shelves</p></div></div>
+        </div>
+      </div>
+
+      <div class="rpage" id="bodegero-page-inventory">
+        <div class="page-title-row"><p class="t">Inventory</p><p class="s">View stock levels · stock-out to shelves</p></div>
+        <div class="card">
+          <p class="card-title">Stock Levels</p>
+          <div class="list-row"><div><p class="list-title">Jasmine Rice 5kg</p><p class="list-meta">Groceries</p></div><span class="list-value tabular" style="margin-left:auto;">184</span></div>
+          <div class="list-row"><div><p class="list-title">Cooking Oil 1L</p><p class="list-meta">Groceries</p></div><span class="list-value tabular" style="margin-left:auto;">96</span></div>
+          <div class="list-row"><div><p class="list-title">Bottled Water 1L</p><p class="list-meta">Beverages</p></div><span class="list-value tabular" style="margin-left:auto;">310</span></div>
+          <div class="list-row"><div><p class="list-title">Frozen Chicken 1kg</p><p class="list-meta">Frozen &amp; Dairy</p></div><span class="list-value tabular" style="margin-left:auto;">58</span></div>
+        </div>
+        <div class="card">
+          <p class="card-title">Stock-Out to Shelves</p>
+          <div class="field-group"><label class="field-label">Product</label><select class="field-input" id="bodegeroProduct"><option>Jasmine Rice 5kg</option><option>Cooking Oil 1L</option><option>Bottled Water 1L</option></select></div>
+          <div class="action-row">
+            <div class="field-group" style="flex:1; margin-bottom:0;"><label class="field-label">Quantity</label><input class="field-input" id="bodegeroOutQty" placeholder="0"/></div>
+            <button class="btn btn-primary" style="margin-top:18px;" onclick="recordTransfer()">Record Transfer</button>
+          </div>
+        </div>
+        <div class="card">
+          <p class="card-title">Recent Transfers</p>
+          <div id="bodegeroTransfers">
+            <div class="list-row"><div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div><p class="list-title">Cooking Oil 1L · −10</p><p class="list-meta">Yesterday, 4:20 PM · to shelves</p></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rpage" id="bodegero-page-delivery">
+        <div class="page-title-row"><p class="t">Delivery</p><p class="s">Receive and stock-in incoming deliveries</p></div>
+        <div class="card" id="bodegeroDeliveryCard">
+          <p class="card-title">Pending Delivery — Receive &amp; Stock-In</p>
+          <p class="card-sub">Coldline Dairy &amp; Frozen · 12 SKUs</p>
+          <div class="list-row"><div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/></svg></div><div><p class="list-title">Full Cream Milk 1L</p><p class="list-meta">Expected 40 · check qty</p></div><input class="field-input qty-input" id="bodegeroQty1" value="38"/></div>
+          <div class="list-row"><div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/></svg></div><div><p class="list-title">Frozen Chicken 1kg</p><p class="list-meta">Expected 30 · check qty</p></div><input class="field-input qty-input" id="bodegeroQty2" value="30"/></div>
+          <button class="btn btn-primary btn-block" style="margin-top:10px;" onclick="confirmStockIn()">Confirm Stock-In</button>
+        </div>
+      </div>
+
+      <div class="rpage" id="bodegero-page-profile">
+        <div class="page-title-row"><p class="t">My Profile</p></div>
+        <div class="card">
+          <p class="card-title">Personal Info</p>
+          <div class="field-group"><label class="field-label">Full Name</label><input class="field-input" value="Rico Santos" disabled/></div>
+          <div class="field-group"><label class="field-label">Role</label><input class="field-input" value="Bodegero" disabled/></div>
+          <div class="field-group"><label class="field-label">Contact Number</label><input class="field-input" value="0917 664 9012"/></div>
+          <button class="btn btn-primary">Save Changes</button>
+        </div>
+        <div class="card">
+          <p class="card-title">Security</p>
+          <div class="field-group"><label class="field-label">Current Password</label><input class="field-input" type="password" value="••••••••"/></div>
+          <div class="field-group"><label class="field-label">New Password</label><input class="field-input" type="password" placeholder="Enter new password"/></div>
+          <button class="btn btn-outlined btn-block">Update Password</button>
+        </div>
+      </div>
+
+    </div>
+    <div class="footer-nav">
+      <button class="fn-item active" data-page="home" onclick="showRolePage('bodegero','home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Home</button>
+      <button class="fn-item" data-page="inventory" onclick="showRolePage('bodegero','inventory')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>Inventory</button>
+      <button class="fn-item" data-page="delivery" onclick="showRolePage('bodegero','delivery')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="6" width="15" height="12" rx="1.5"/><path d="M16 10h3.6a1 1 0 0 1 .9.55L22 14v4h-2"/></svg>Delivery</button>
+      <button class="fn-item" data-page="profile" onclick="showRolePage('bodegero','profile')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>Me</button>
+    </div>
+  </div>
+
+  <!-- ================= DELIVERY CHECKER ================= -->
+  <div class="role-view" id="role-deliverychecker" style="display:none;">
+    <div class="app-bar">
+      <div class="app-bar-top">
+        <div class="app-bar-brand"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 12.2a2 2 0 0 0 2 1.6h8.4a2 2 0 0 0 2-1.6L21.5 8H6.5"/></svg>Baycel Growcery</div>
+        <div class="bell"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/></svg><span class="dot"></span></div>
+      </div>
+      <p class="app-greeting">Hi, Joy</p>
+      <p class="app-role">Delivery Checker</p>
+    </div>
+    <div class="content">
+
+      <div class="rpage active" id="deliverychecker-page-home">
+        <div class="card clock-card">
+          <div class="clock-ring" id="deliverycheckerRing" style="background:rgba(254,179,0,0.16);"><svg viewBox="0 0 24 24" fill="none" stroke="#F57F17" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg></div>
+          <div><p class="clock-status" id="deliverycheckerStatus">Clocked in</p><p class="clock-time tabular" id="deliverycheckerTime">Since 8:12 AM · 12m late</p></div>
+          <button class="btn btn-primary clock-btn" id="deliverycheckerClockBtn" onclick="toggleClock('deliverychecker')">Time Out</button>
+        </div>
+        <div class="card">
+          <p class="card-title">Today's Summary</p>
+          <div class="list-row"><div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="6" width="15" height="12" rx="1.5"/></svg></div><div><p class="list-title">1 delivery pending verification</p><p class="list-meta">Sunrise Beverages Co.</p></div><span class="pill pill-amber" style="margin-left:auto;"><span class="pill-dot"></span>Pending</span></div>
+        </div>
+      </div>
+
+      <div class="rpage" id="deliverychecker-page-inventory">
+        <div class="page-title-row"><p class="t">Inventory</p><p class="s">View stock levels</p></div>
+        <div class="card">
+          <p class="card-title">Stock Levels</p>
+          <div class="list-row"><div><p class="list-title">Jasmine Rice 5kg</p><p class="list-meta">Groceries</p></div><span class="list-value tabular" style="margin-left:auto;">184</span></div>
+          <div class="list-row"><div><p class="list-title">Canned Sardines 155g</p><p class="list-meta">Groceries</p></div><span class="list-value tabular" style="margin-left:auto;">22</span></div>
+          <div class="list-row"><div><p class="list-title">Powdered Juice Drink 25g</p><p class="list-meta">Beverages</p></div><span class="list-value tabular" style="margin-left:auto;">14</span></div>
+          <div class="list-row"><div><p class="list-title">Full Cream Milk 1L</p><p class="list-meta">Frozen &amp; Dairy</p></div><span class="list-value tabular" style="margin-left:auto;">0</span></div>
+        </div>
+      </div>
+
+      <div class="rpage" id="deliverychecker-page-delivery">
+        <div class="page-title-row"><p class="t">Delivery</p><p class="s">Create and verify delivery records</p></div>
+        <div class="card">
+          <p class="card-title">Create Delivery Record</p>
+          <div class="field-group"><label class="field-label">Supplier</label><input class="field-input" id="dcSupplier" placeholder="e.g. Golden Grain Traders"/></div>
+          <div class="field-group"><label class="field-label">Products &amp; Quantities</label><input class="field-input" id="dcProducts" placeholder="Add SKUs and expected quantities"/></div>
+          <button class="btn btn-primary btn-block" onclick="encodeDelivery()">Encode Delivery</button>
+        </div>
+        <div class="card">
+          <p class="card-title">Verify Deliveries</p>
+          <div id="dcVerifyList">
+            <div class="dc-entry" style="margin-bottom:10px;">
+              <div class="list-row"><div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="6" width="15" height="12" rx="1.5"/></svg></div><div><p class="list-title">Sunrise Beverages Co.</p><p class="list-meta">9 SKUs · arrived 9:15 AM</p></div><span class="pill pill-amber" id="dcStatus0"><span class="pill-dot"></span>Pending</span></div>
+              <div class="action-row" id="dcActions0" style="margin-top:8px;">
+                <button class="btn btn-primary btn-sm" style="flex:1;" onclick="markReceived(0)">Mark Received</button>
+                <button class="btn btn-outlined btn-sm" style="flex:1;" onclick="reportIncomplete(0)">Report Incomplete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rpage" id="deliverychecker-page-profile">
+        <div class="page-title-row"><p class="t">My Profile</p></div>
+        <div class="card">
+          <p class="card-title">Personal Info</p>
+          <div class="field-group"><label class="field-label">Full Name</label><input class="field-input" value="Joy Ramos" disabled/></div>
+          <div class="field-group"><label class="field-label">Role</label><input class="field-input" value="Delivery Checker" disabled/></div>
+          <div class="field-group"><label class="field-label">Contact Number</label><input class="field-input" value="0919 442 5580"/></div>
+          <button class="btn btn-primary">Save Changes</button>
+        </div>
+        <div class="card">
+          <p class="card-title">Security</p>
+          <div class="field-group"><label class="field-label">Current Password</label><input class="field-input" type="password" value="••••••••"/></div>
+          <div class="field-group"><label class="field-label">New Password</label><input class="field-input" type="password" placeholder="Enter new password"/></div>
+          <button class="btn btn-outlined btn-block">Update Password</button>
+        </div>
+      </div>
+
+    </div>
+    <div class="footer-nav">
+      <button class="fn-item active" data-page="home" onclick="showRolePage('deliverychecker','home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Home</button>
+      <button class="fn-item" data-page="inventory" onclick="showRolePage('deliverychecker','inventory')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>Inventory</button>
+      <button class="fn-item" data-page="delivery" onclick="showRolePage('deliverychecker','delivery')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="6" width="15" height="12" rx="1.5"/><path d="M16 10h3.6a1 1 0 0 1 .9.55L22 14v4h-2"/></svg>Delivery</button>
+      <button class="fn-item" data-page="profile" onclick="showRolePage('deliverychecker','profile')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>Me</button>
+    </div>
+  </div>
+
+  <!-- ================= MERCHANDISER ================= -->
+  <div class="role-view" id="role-merchandiser" style="display:none;">
+    <div class="app-bar">
+      <div class="app-bar-top">
+        <div class="app-bar-brand"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 12.2a2 2 0 0 0 2 1.6h8.4a2 2 0 0 0 2-1.6L21.5 8H6.5"/></svg>Baycel Growcery</div>
+        <div class="bell"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/></svg></div>
+      </div>
+      <p class="app-greeting">Hi, Liza</p>
+      <p class="app-role">Merchandiser</p>
+    </div>
+    <div class="content">
+
+      <div class="rpage active" id="merchandiser-page-home">
+        <div class="card clock-card">
+          <div class="clock-ring" id="merchandiserRing" style="background:rgba(198,40,40,0.1);"><svg viewBox="0 0 24 24" fill="none" stroke="#C62828" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg></div>
+          <div><p class="clock-status" id="merchandiserStatus">Not clocked in</p><p class="clock-time" id="merchandiserTime">Tap to start your shift</p></div>
+          <button class="btn btn-primary clock-btn" id="merchandiserClockBtn" onclick="toggleClock('merchandiser')">Time In</button>
+        </div>
+        <div class="card">
+          <p class="card-title">Today's Summary</p>
+          <div class="list-row"><div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div><p class="list-title">3 assigned products</p><p class="list-meta">Tap Products to stock-out</p></div></div>
+        </div>
+      </div>
+
+      <div class="rpage" id="merchandiser-page-products">
+        <div class="page-title-row"><p class="t">My Assigned Products</p><p class="s">Stock-out only applies to products assigned to you</p></div>
+        <div class="card">
+          <div class="list-row"><div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2h8l1 4H7l1-4Z"/><path d="M6 6h12l-1 15a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 6Z"/></svg></div><div><p class="list-title">Powdered Juice Drink 25g</p><p class="list-meta">14 units on shelf</p></div><button class="btn btn-outlined btn-sm" onclick="stockOut(this,'Powdered Juice Drink 25g')">Stock Out</button></div>
+          <div class="list-row"><div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v4H3z"/><path d="M5 7v13a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7"/></svg></div><div><p class="list-title">Assorted Biscuits 200g</p><p class="list-meta">19 units on shelf</p></div><button class="btn btn-outlined btn-sm" onclick="stockOut(this,'Assorted Biscuits 200g')">Stock Out</button></div>
+          <div class="list-row"><div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/></svg></div><div><p class="list-title">Potato Chips 60g</p><p class="list-meta">142 units on shelf</p></div><button class="btn btn-outlined btn-sm" onclick="stockOut(this,'Potato Chips 60g')">Stock Out</button></div>
+        </div>
+        <div class="card">
+          <p class="card-title">Recent Stock Movements</p>
+          <div id="merchMovements">
+            <div class="list-row"><div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div><p class="list-title">Potato Chips 60g · −12</p><p class="list-meta">Today, 10:40 AM</p></div></div>
+            <div class="list-row"><div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div><p class="list-title">Assorted Biscuits 200g · −6</p><p class="list-meta">Yesterday, 3:15 PM</p></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rpage" id="merchandiser-page-profile">
+        <div class="page-title-row"><p class="t">My Profile</p></div>
+        <div class="card">
+          <p class="card-title">Personal Info</p>
+          <div class="field-group"><label class="field-label">Full Name</label><input class="field-input" value="Liza Fernandez" disabled/></div>
+          <div class="field-group"><label class="field-label">Role</label><input class="field-input" value="Merchandiser" disabled/></div>
+          <div class="field-group"><label class="field-label">Contact Number</label><input class="field-input" value="0921 887 3346"/></div>
+          <button class="btn btn-primary">Save Changes</button>
+        </div>
+        <div class="card">
+          <p class="card-title">Security</p>
+          <div class="field-group"><label class="field-label">Current Password</label><input class="field-input" type="password" value="••••••••"/></div>
+          <div class="field-group"><label class="field-label">New Password</label><input class="field-input" type="password" placeholder="Enter new password"/></div>
+          <button class="btn btn-outlined btn-block">Update Password</button>
+        </div>
+      </div>
+
+    </div>
+    <div class="footer-nav">
+      <button class="fn-item active" data-page="home" onclick="showRolePage('merchandiser','home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Home</button>
+      <button class="fn-item" data-page="products" onclick="showRolePage('merchandiser','products')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>Products</button>
+      <button class="fn-item" data-page="profile" onclick="showRolePage('merchandiser','profile')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>Me</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+</div>
+
+<script>
+  // ---- Role switching (also resets each role back to its Home page) ----
+  document.querySelectorAll('#roleSwitcher .demo-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#roleSwitcher .demo-chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+      document.querySelectorAll('.role-view').forEach(v => v.style.display = 'none');
+      const role = chip.dataset.role;
+      document.getElementById('role-' + role).style.display = 'block';
+      showRolePage(role, 'home');
+    });
+  });
+
+  // ---- Sub-page switching within a role ----
+  function showRolePage(role, page){
+    const scope = document.getElementById('role-' + role);
+    scope.querySelectorAll('.rpage').forEach(p => p.classList.remove('active'));
+    document.getElementById(role + '-page-' + page).classList.add('active');
+    scope.querySelectorAll('.fn-item').forEach(f => f.classList.toggle('active', f.dataset.page === page));
+  }
+
+  // ---- Toast ----
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(window._toastTimer);
+    window._toastTimer = setTimeout(()=> t.classList.remove('show'), 2200);
+  }
+
+  function nowTime(){
+    const d = new Date();
+    let h = d.getHours(); const m = d.getMinutes().toString().padStart(2,'0');
+    const ampm = h >= 12 ? 'PM' : 'AM'; h = h % 12; if(h === 0) h = 12;
+    return h + ':' + m + ' ' + ampm;
+  }
+
+  // ---- RFID clock toggle (shared across all roles) ----
+  const clockState = { cashier:true, bagger:false, bodegero:true, deliverychecker:true, merchandiser:false };
+
+  function toggleClock(role){
+    clockState[role] = !clockState[role];
+    const ring = document.getElementById(role + 'Ring');
+    const svg = ring.querySelector('svg');
+    const status = document.getElementById(role + 'Status');
+    const time = document.getElementById(role + 'Time');
+    const btn = document.getElementById(role + 'ClockBtn');
+    if(clockState[role]){
+      const t = nowTime();
+      status.textContent = 'Clocked in';
+      time.textContent = 'Since ' + t;
+      time.classList.add('tabular');
+      btn.textContent = 'Time Out';
+      ring.style.background = 'rgba(46,125,50,0.1)';
+      svg.setAttribute('stroke', '#2E7D32');
+      showToast('Timed in at ' + t);
+    } else {
+      status.textContent = 'Not clocked in';
+      time.textContent = 'Tap to start your shift';
+      btn.textContent = 'Time In';
+      ring.style.background = 'rgba(198,40,40,0.1)';
+      svg.setAttribute('stroke', '#C62828');
+      showToast('Timed out at ' + nowTime());
+    }
+  }
+
+  // ---- Cashier: submit sales counter ----
+  function submitCounter(){
+    const shift = document.getElementById('cashierShift').value;
+    const salesInput = document.getElementById('cashierSales');
+    const sales = parseFloat(salesInput.value);
+    if(!salesInput.value || isNaN(sales) || sales <= 0){ showToast('Enter a valid sales total'); return; }
+    const list = document.getElementById('cashierSubmissions');
+    const row = document.createElement('div');
+    row.className = 'list-row';
+    row.innerHTML = '<div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div><p class="list-title">Sep 10 · ' + shift.split(' (')[0] + ' shift</p><p class="list-meta">Submitted ' + nowTime() + '</p></div><span class="list-value tabular">₱' + sales.toLocaleString(undefined,{minimumFractionDigits:2}) + '</span>';
+    list.prepend(row);
+    salesInput.value = '';
+    showToast('Counter record submitted');
+  }
+
+  // ---- Bagger: submit absence ----
+  function submitAbsence(){
+    const dateInput = document.getElementById('baggerDate');
+    const reasonInput = document.getElementById('baggerReason');
+    const date = dateInput.value.trim();
+    const reason = reasonInput.value.trim();
+    if(!date || !reason){ showToast('Fill in date and reason'); return; }
+    const list = document.getElementById('baggerRequests');
+    const row = document.createElement('div');
+    row.className = 'list-row';
+    row.innerHTML = '<div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div><div><p class="list-title">' + date + ' · ' + reason + '</p><p class="list-meta">Submitted today</p></div><span class="pill pill-amber"><span class="pill-dot"></span>Pending</span>';
+    list.prepend(row);
+    dateInput.value = ''; reasonInput.value = '';
+    showToast('Absence request submitted');
+  }
+
+  // ---- Bodegero: confirm stock-in ----
+  function confirmStockIn(){
+    const card = document.getElementById('bodegeroDeliveryCard');
+    card.innerHTML = '<p class="card-title">Stock-In Confirmed</p><p class="card-sub" style="margin-bottom:0;">Coldline Dairy &amp; Frozen · 12 SKUs added to inventory</p><span class="pill pill-green" style="margin-top:10px;"><span class="pill-dot"></span>Completed</span>';
+    showToast('Stock-in confirmed');
+  }
+
+  // ---- Bodegero: record stock-out transfer ----
+  function recordTransfer(){
+    const product = document.getElementById('bodegeroProduct').value;
+    const qtyInput = document.getElementById('bodegeroOutQty');
+    const qty = parseInt(qtyInput.value);
+    if(!qtyInput.value || isNaN(qty) || qty <= 0){ showToast('Enter a valid quantity'); return; }
+    const list = document.getElementById('bodegeroTransfers');
+    const row = document.createElement('div');
+    row.className = 'list-row';
+    row.innerHTML = '<div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div><p class="list-title">' + product + ' · −' + qty + '</p><p class="list-meta">' + nowTime() + ' · to shelves</p></div>';
+    list.prepend(row);
+    qtyInput.value = '';
+    showToast('Transfer recorded');
+  }
+
+  // ---- Delivery Checker: encode + verify ----
+  let dcCounter = 0;
+  function encodeDelivery(){
+    const supplierInput = document.getElementById('dcSupplier');
+    const productsInput = document.getElementById('dcProducts');
+    const supplier = supplierInput.value.trim();
+    const products = productsInput.value.trim();
+    if(!supplier || !products){ showToast('Fill in supplier and products'); return; }
+    dcCounter++;
+    const id = dcCounter;
+    const list = document.getElementById('dcVerifyList');
+    const wrap = document.createElement('div');
+    wrap.className = 'dc-entry';
+    wrap.style.marginBottom = '10px';
+    wrap.innerHTML = '<div class="list-row"><div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="6" width="15" height="12" rx="1.5"/></svg></div><div><p class="list-title">' + supplier + '</p><p class="list-meta">' + products + ' · encoded ' + nowTime() + '</p></div><span class="pill pill-amber" id="dcStatus' + id + '"><span class="pill-dot"></span>Pending</span></div><div class="action-row" id="dcActions' + id + '" style="margin-top:8px;"><button class="btn btn-primary btn-sm" style="flex:1;" onclick="markReceived(' + id + ')">Mark Received</button><button class="btn btn-outlined btn-sm" style="flex:1;" onclick="reportIncomplete(' + id + ')">Report Incomplete</button></div>';
+    list.prepend(wrap);
+    supplierInput.value = ''; productsInput.value = '';
+    showToast('Delivery encoded');
+  }
+  function markReceived(id){
+    const status = document.getElementById('dcStatus' + id);
+    status.className = 'pill pill-green';
+    status.innerHTML = '<span class="pill-dot"></span>Verified';
+    document.getElementById('dcActions' + id).style.display = 'none';
+    showToast('Delivery marked received');
+  }
+  function reportIncomplete(id){
+    const status = document.getElementById('dcStatus' + id);
+    status.className = 'pill pill-red';
+    status.innerHTML = '<span class="pill-dot"></span>Incomplete';
+    document.getElementById('dcActions' + id).style.display = 'none';
+    showToast('Discrepancy reported');
+  }
+
+  // ---- Merchandiser: stock-out assigned products ----
+  function stockOut(btn, product){
+    const qty = window.prompt('How many units of "' + product + '" to stock out?');
+    if(qty === null) return;
+    const n = parseInt(qty);
+    if(isNaN(n) || n <= 0){ showToast('Enter a valid quantity'); return; }
+    const row = btn.closest('.list-row');
+    const metaEl = row.querySelector('.list-meta');
+    const current = parseInt(metaEl.textContent);
+    const remaining = Math.max(0, current - n);
+    metaEl.textContent = remaining + ' units on shelf';
+    const list = document.getElementById('merchMovements');
+    const newRow = document.createElement('div');
+    newRow.className = 'list-row';
+    newRow.innerHTML = '<div class="list-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div><p class="list-title">' + product + ' · −' + n + '</p><p class="list-meta">' + nowTime() + ', today</p></div>';
+    list.prepend(newRow);
+    showToast('Stock-out recorded');
+  }
+</script>
+
+</body>
+</html>

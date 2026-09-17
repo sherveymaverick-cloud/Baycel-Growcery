@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Baycel Growcery — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --crimson:#C62828; --crimson-light:#EF5350; --crimson-dark:#8E0000;
+    --marigold:#FEB300; --marigold-dark:#F57F17;
+    --blue:#006AB8;
+    --surface:#F8F9FA; --card:#FFFFFF;
+    --text-primary:#1C1B1F; --text-secondary:#5B403D; --text-muted:#616161; --text-disabled:#9E9E9E;
+    --divider:#E0E0E0;
+    --error:#BA1A1A; --success:#2E7D32;
+    --viz1:#C62828; --viz2:#FEB300; --viz3:#006AB8; --viz4:#7B1FA2; --viz5:#00838F; --viz6:#2E7D32;
+    --r-sm:2px; --r-md:4px; --r-lg:8px; --r-xl:12px; --r-full:9999px;
+    --shadow-sm:0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md:0 4px 12px rgba(28,27,31,0.08);
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; font-family:'Inter',system-ui,sans-serif; background:var(--surface); color:var(--text-primary); -webkit-font-smoothing:antialiased; }
+  .tabular{ font-variant-numeric: tabular-nums; }
+  p{ margin:0; }
+
+  .shell{ display:flex; min-height:100vh; }
+
+  /* SIDEBAR */
+  .sidebar{ width:256px; flex-shrink:0; background:var(--card); box-shadow:0 1px 8px rgba(0,0,0,0.04); display:flex; flex-direction:column; }
+  .sidebar-header{ background:linear-gradient(135deg, var(--crimson) 0%, var(--crimson-dark) 100%); padding:20px 16px 16px; color:#fff; }
+  .brand{ display:flex; align-items:center; gap:10px; margin-bottom:18px; }
+  .brand-badge{ width:34px; height:34px; border-radius:var(--r-full); background:rgba(255,255,255,0.18); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .brand-name{ font-size:15px; font-weight:700; letter-spacing:-0.01em; line-height:1.1; }
+  .brand-sub{ font-size:10px; font-weight:500; letter-spacing:0.04em; opacity:0.75; text-transform:uppercase; margin-top:2px;}
+  .avatar-row{ display:flex; align-items:center; gap:10px; }
+  .avatar{ width:36px; height:36px; border-radius:var(--r-full); background:rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex-shrink:0; }
+  .avatar-name{ font-size:13.5px; font-weight:600; line-height:1.2; }
+  .avatar-role{ display:inline-block; margin-top:3px; font-size:10px; font-weight:600; letter-spacing:0.03em; background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:var(--r-lg); }
+
+  .nav{ flex:1; padding:12px 8px; overflow-y:auto; }
+  .nav-item{ display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:var(--r-xl); margin-bottom:2px; cursor:pointer; color:var(--text-muted); font-size:13px; font-weight:500; position:relative; transition:background 160ms ease; }
+  .nav-item svg{ width:18px; height:18px; flex-shrink:0; }
+  .nav-item:hover{ background:#F8F9FA; }
+  .nav-item.active{ color:var(--crimson); font-weight:600; }
+  .nav-item.active::before{ content:""; position:absolute; left:-8px; top:50%; transform:translateY(-50%); width:4px; height:20px; background:var(--crimson); border-radius:var(--r-sm); }
+  .nav-section-label{ font-size:10px; font-weight:600; letter-spacing:0.06em; color:var(--text-disabled); text-transform:uppercase; margin:14px 12px 6px; }
+  .nav-footer{ padding:12px 16px 18px; border-top:1px solid var(--divider); }
+  .logout{ display:flex; align-items:center; gap:10px; color:var(--error); font-size:13px; font-weight:600; cursor:pointer; }
+  .logout svg{ width:17px; height:17px; }
+
+  .main{ flex:1; min-width:0; display:flex; flex-direction:column; }
+
+  .topbar{ background:var(--card); border-radius:var(--r-lg); box-shadow:var(--shadow-sm); margin:16px 24px 0; padding:12px 16px; display:flex; align-items:center; gap:16px; }
+  .search{ flex:1; max-width:360px; background:var(--surface); border-radius:var(--r-md); display:flex; align-items:center; gap:8px; padding:9px 12px; }
+  .search svg{ width:16px; height:16px; color:var(--text-disabled); flex-shrink:0; }
+  .search input{ border:none; background:transparent; outline:none; font-family:inherit; font-size:13px; width:100%; color:var(--text-primary); }
+  .search input::placeholder{ color:var(--text-disabled); }
+  .topbar-date{ font-size:12px; color:var(--text-muted); white-space:nowrap; }
+  .topbar-right{ display:flex; align-items:center; gap:10px; margin-left:auto; }
+  .icon-btn{ width:36px; height:36px; border-radius:var(--r-full); display:flex; align-items:center; justify-content:center; background:var(--surface); position:relative; cursor:pointer; flex-shrink:0; }
+  .icon-btn svg{ width:17px; height:17px; color:var(--text-secondary); }
+  .badge-dot{ position:absolute; top:7px; right:7px; width:7px; height:7px; border-radius:var(--r-full); background:var(--crimson); border:1.5px solid var(--card); }
+
+  .content{ padding:20px 24px 48px; max-width:1280px; width:100%; margin:0 auto; }
+
+  .page{ display:none; }
+  .page.active{ display:block; }
+
+  .welcome-title{ font-size:26px; font-weight:700; letter-spacing:-0.02em; line-height:1.2; margin:0 0 4px; }
+  .welcome-sub{ font-size:13px; color:var(--text-secondary); margin:0 0 20px; }
+
+  .page-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:18px; flex-wrap:wrap; }
+  .page-title{ font-size:20px; font-weight:700; letter-spacing:-0.01em; margin:0 0 2px; }
+  .page-sub{ font-size:12.5px; color:var(--text-secondary); }
+
+  /* buttons */
+  .btn{ font-family:inherit; font-size:12px; font-weight:600; border-radius:var(--r-md); padding:10px 18px; cursor:pointer; border:none; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+  .btn svg{ width:14px; height:14px; }
+  .btn-primary{ background:var(--crimson); color:#fff; }
+  .btn-primary:hover{ background:var(--crimson-dark); }
+  .btn-outlined{ background:transparent; color:var(--text-primary); border:1px solid var(--divider); }
+  .btn-outlined:hover{ background:var(--surface); }
+
+  /* stat grid (dashboard) */
+  .stat-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px; }
+  .stat-card{ background:var(--card); border:1px solid rgba(224,224,224,0.5); border-radius:var(--r-lg); box-shadow:var(--shadow-sm); padding:16px; }
+  .stat-icon{ width:34px; height:34px; border-radius:var(--r-lg); display:flex; align-items:center; justify-content:center; margin-bottom:12px; }
+  .stat-icon svg{ width:17px; height:17px; }
+  .stat-value{ font-size:24px; font-weight:700; letter-spacing:-0.01em; }
+  .stat-title{ font-size:12.5px; color:var(--text-secondary); margin-top:2px; }
+  .stat-sub{ font-size:11px; font-weight:600; margin-top:6px; display:inline-block; }
+
+  .mini-stat-row{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:18px; }
+  .mini-stat{ background:var(--card); border:1px solid rgba(224,224,224,0.5); border-radius:var(--r-lg); box-shadow:var(--shadow-sm); padding:14px 16px; }
+  .mini-stat-value{ font-size:20px; font-weight:700; }
+  .mini-stat-label{ font-size:11.5px; color:var(--text-muted); margin-top:2px; }
+
+  .chart-row{ display:grid; grid-template-columns:1.6fr 1fr; gap:16px; margin-bottom:16px; align-items:stretch; }
+  .card{ background:var(--card); border:1px solid rgba(224,224,224,0.5); border-radius:var(--r-lg); box-shadow:var(--shadow-sm); padding:16px; }
+  .card-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; gap:10px; flex-wrap:wrap; }
+  .card-title{ font-size:16px; font-weight:600; margin:0; }
+  .card-period{ font-size:12px; color:var(--text-muted); background:var(--surface); padding:5px 10px; border-radius:var(--r-md); display:flex; align-items:center; gap:4px; }
+  .card-period svg{ width:12px; height:12px; }
+
+  .donut-wrap{ display:flex; flex-direction:column; align-items:center; }
+  .donut-center-value{ font-size:20px; font-weight:700; }
+  .donut-center-label{ font-size:11px; color:var(--text-muted); }
+  .legend{ display:flex; flex-direction:column; gap:8px; width:100%; margin-top:14px; }
+  .legend-row{ display:flex; align-items:center; gap:8px; font-size:12px; }
+  .legend-dot{ width:8px; height:8px; border-radius:var(--r-full); flex-shrink:0; }
+  .legend-label{ color:var(--text-primary); flex:1; }
+  .legend-val{ color:var(--text-muted); font-weight:500; }
+
+  .bottom-row{ display:grid; grid-template-columns:1fr 1.5fr; gap:16px; }
+  .lb-row{ display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid rgba(224,224,224,0.5); }
+  .lb-row:last-child{ border-bottom:none; }
+  .lb-rank{ width:20px; font-size:12px; font-weight:700; color:var(--text-disabled); flex-shrink:0; }
+  .lb-icon{ width:34px; height:34px; border-radius:var(--r-xl); background:var(--surface); flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .lb-icon svg{ width:16px; height:16px; color:var(--text-secondary); }
+  .lb-name{ font-size:13px; font-weight:600; }
+  .lb-meta{ font-size:11.5px; color:var(--text-muted); margin-top:1px; }
+  .lb-value{ font-size:13px; font-weight:600; margin-left:auto; }
+  .view-all{ font-size:12px; font-weight:600; color:var(--text-secondary); cursor:pointer; }
+
+  table{ width:100%; border-collapse:collapse; }
+  thead th{ text-align:left; font-size:11px; font-weight:500; letter-spacing:0.03em; text-transform:uppercase; color:var(--text-muted); padding:0 8px 8px; border-bottom:1px solid var(--divider); }
+  tbody td{ padding:9px 8px; font-size:12.5px; border-bottom:1px solid rgba(224,224,224,0.5); }
+  tbody tr:last-child td{ border-bottom:none; }
+  tbody tr:hover{ background:var(--surface); }
+  .cell-strong{ font-weight:600; }
+  .cell-muted{ color:var(--text-muted); font-size:11.5px; margin-top:1px; }
+
+  .pill{ display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:600; padding:3px 9px; border-radius:var(--r-full); white-space:nowrap; }
+  .pill-dot{ width:5px; height:5px; border-radius:var(--r-full); }
+  .pill-green{ background:rgba(46,125,50,0.12); color:var(--success); }
+  .pill-green .pill-dot{ background:var(--success); }
+  .pill-amber{ background:rgba(254,179,0,0.18); color:var(--marigold-dark); }
+  .pill-amber .pill-dot{ background:var(--marigold-dark); }
+  .pill-red{ background:rgba(198,40,40,0.1); color:var(--crimson-dark); }
+  .pill-red .pill-dot{ background:var(--crimson); }
+  .pill-blue{ background:rgba(0,106,184,0.1); color:var(--blue); }
+  .pill-blue .pill-dot{ background:var(--blue); }
+  .pill-grey{ background:var(--surface); color:var(--text-muted); }
+  .pill-grey .pill-dot{ background:var(--text-disabled); }
+
+  /* chips */
+  .chip-row{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+  .chip{ font-size:12px; font-weight:600; padding:7px 14px; border-radius:var(--r-sm); border:1px solid var(--divider); color:var(--text-primary); cursor:pointer; background:transparent; font-family:inherit; }
+  .chip.selected{ background:var(--crimson); color:#fff; border-color:var(--crimson); }
+
+  /* forms */
+  .field-group{ margin-bottom:14px; }
+  .field-label{ font-size:11px; font-weight:500; color:var(--text-muted); letter-spacing:0.03em; margin-bottom:5px; display:block; }
+  .field-input{ width:100%; background:var(--card); border:1px solid var(--divider); border-radius:var(--r-md); padding:10px 12px; font-family:inherit; font-size:13px; color:var(--text-primary); outline:none; }
+  .field-input:focus{ border-color:var(--crimson); border-width:2px; padding:9px 11px; }
+  .field-grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+
+  /* employee cards */
+  .emp-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  .emp-card{ background:var(--card); border:1px solid rgba(224,224,224,0.5); border-radius:var(--r-lg); box-shadow:var(--shadow-sm); padding:16px; }
+  .emp-top{ display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+  .emp-avatar{ width:44px; height:44px; border-radius:var(--r-full); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; color:#fff; flex-shrink:0; }
+  .emp-name{ font-size:13.5px; font-weight:600; }
+  .emp-role{ font-size:10.5px; font-weight:600; padding:2px 8px; border-radius:var(--r-lg); display:inline-block; margin-top:3px; }
+  .emp-meta{ font-size:12px; color:var(--text-muted); display:flex; align-items:center; gap:6px; margin-top:6px; }
+  .emp-meta svg{ width:13px; height:13px; flex-shrink:0; }
+  .emp-status{ display:flex; align-items:center; gap:5px; font-size:11px; margin-top:10px; padding-top:10px; border-top:1px solid rgba(224,224,224,0.5); color:var(--text-muted); }
+  .emp-status-dot{ width:6px; height:6px; border-radius:var(--r-full); background:var(--success); }
+
+  /* report cards */
+  .report-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:16px;}
+  .report-card{ background:var(--card); border:1px solid rgba(224,224,224,0.5); border-radius:var(--r-lg); box-shadow:var(--shadow-sm); padding:16px; display:flex; flex-direction:column; }
+  .report-icon{ width:36px; height:36px; border-radius:var(--r-lg); display:flex; align-items:center; justify-content:center; margin-bottom:10px; }
+  .report-icon svg{ width:17px; height:17px; }
+  .report-title{ font-size:14px; font-weight:600; margin:0 0 4px; }
+  .report-desc{ font-size:12px; color:var(--text-muted); margin:0 0 14px; line-height:1.45; flex:1; }
+
+  /* toggle switch */
+  .toggle{ position:relative; width:38px; height:22px; flex-shrink:0; display:inline-block; }
+  .toggle input{ opacity:0; width:0; height:0; position:absolute; }
+  .toggle-track{ position:absolute; inset:0; background:var(--divider); border-radius:var(--r-full); cursor:pointer; transition:background 160ms; }
+  .toggle-track::before{ content:""; position:absolute; width:16px; height:16px; left:3px; top:3px; background:#fff; border-radius:var(--r-full); transition:transform 160ms; box-shadow:0 1px 2px rgba(0,0,0,0.2); }
+  .toggle input:checked + .toggle-track{ background:var(--crimson); }
+  .toggle input:checked + .toggle-track::before{ transform:translateX(16px); }
+
+  .settings-row{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 0; border-bottom:1px solid rgba(224,224,224,0.5); }
+  .settings-row:last-child{ border-bottom:none; }
+  .settings-row-title{ font-size:13px; font-weight:600; }
+  .settings-row-desc{ font-size:11.5px; color:var(--text-muted); margin-top:2px; }
+
+  .role-row{ display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid rgba(224,224,224,0.5); }
+  .role-row:last-child{ border-bottom:none; }
+  .role-dot{ width:8px; height:8px; border-radius:var(--r-full); flex-shrink:0; }
+  .role-name{ font-size:13px; font-weight:600; width:150px; flex-shrink:0; }
+  .role-access{ font-size:12px; color:var(--text-muted); }
+
+  .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .stack{ display:flex; flex-direction:column; gap:16px; }
+
+  .bottom-nav{ display:none; }
+
+  @media (max-width: 1100px){
+    .stat-grid{ grid-template-columns:repeat(2,1fr); }
+    .mini-stat-row{ grid-template-columns:repeat(2,1fr); }
+    .chart-row{ grid-template-columns:1fr; }
+    .bottom-row{ grid-template-columns:1fr; }
+    .emp-grid{ grid-template-columns:repeat(2,1fr); }
+    .report-grid{ grid-template-columns:repeat(2,1fr); }
+    .two-col{ grid-template-columns:1fr; }
+    .field-grid-2{ grid-template-columns:1fr; }
+  }
+  @media (max-width: 599px){
+    .sidebar{ display:none; }
+    .topbar{ margin:12px 12px 0; }
+    .content{ padding:14px 12px 84px; }
+    .search{ display:none; }
+    .emp-grid{ grid-template-columns:1fr; }
+    .report-grid{ grid-template-columns:1fr; }
+    .bottom-nav{ display:flex; position:fixed; bottom:0; left:0; right:0; height:65px; background:var(--card); box-shadow:0 -1px 8px rgba(0,0,0,0.06); align-items:center; justify-content:space-around; z-index:10; }
+    .bn-item{ display:flex; flex-direction:column; align-items:center; gap:3px; color:var(--text-disabled); font-size:9.5px; font-weight:600; cursor:pointer; }
+    .bn-item svg{ width:20px; height:20px; }
+    .bn-item.active{ color:var(--crimson); }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <div class="brand-badge">
+          <svg viewBox="0 0 24 24" fill="none" width="19" height="19"><path d="M3 4h2l2.4 12.2a2 2 0 0 0 2 1.6h8.4a2 2 0 0 0 2-1.6L21.5 8H6.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9.5" cy="20.5" r="1.4" fill="#fff"/><circle cx="17.5" cy="20.5" r="1.4" fill="#fff"/></svg>
+        </div>
+        <div>
+          <div class="brand-name">Baycel Growcery</div>
+          <div class="brand-sub">Store Management</div>
+        </div>
+      </div>
+      <div class="avatar-row">
+        <div class="avatar">AD</div>
+        <div>
+          <div class="avatar-name">Ana Dela Cruz</div>
+          <span class="avatar-role">Owner</span>
+        </div>
+      </div>
+    </div>
+
+    <nav class="nav" id="sideNav">
+      <div class="nav-item active" data-page="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Dashboard
+      </div>
+      <div class="nav-item" data-page="inventory">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>
+        Inventory
+      </div>
+      <div class="nav-item" data-page="deliveries">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="6" width="15" height="12" rx="1.5"/><path d="M16 10h3.6a1 1 0 0 1 .9.55L22 14v4h-2"/><circle cx="6" cy="18.5" r="1.6"/><circle cx="17.5" cy="18.5" r="1.6"/></svg>
+        Deliveries
+      </div>
+      <div class="nav-item" data-page="attendance">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg>
+        Attendance
+      </div>
+      <div class="nav-item" data-page="employees">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Employees
+      </div>
+      <div class="nav-item" data-page="payroll">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/><path d="M6 14h4"/></svg>
+        Payroll
+      </div>
+      <div class="nav-item" data-page="reports">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="13" y="8" width="3" height="10"/><path d="M15.5 5h3v3"/><path d="M18.4 5.2 12 11.6l-2.5-2.5L5 13.6"/></svg>
+        Reports
+      </div>
+      <div class="nav-section-label">System</div>
+      <div class="nav-item" data-page="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 0 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 0 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1Z"/></svg>
+        Settings
+      </div>
+    </nav>
+
+    <div class="nav-footer">
+      <div class="logout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        Log out
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" placeholder="Search products, employees, suppliers…" />
+      </div>
+      <span class="topbar-date">Thursday, September 10</span>
+      <div class="topbar-right">
+        <div class="icon-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <div class="icon-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span class="badge-dot"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ================= DASHBOARD ================= -->
+      <section class="page active" id="page-dashboard">
+        <p class="welcome-title">Good morning, Ana</p>
+        <p class="welcome-sub">Here's what's happening at Baycel Growcery today.</p>
+
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-icon" style="background:rgba(198,40,40,0.1);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#C62828" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <p class="stat-value tabular">₱48,320</p>
+            <p class="stat-title">Today's Revenue</p>
+            <span class="stat-sub" style="color:#2E7D32;">▲ 12% vs yesterday</span>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:rgba(254,179,0,0.16);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#F57F17" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.5 3h2l2.6 12.4a2 2 0 0 0 2 1.6h8.5a2 2 0 0 0 2-1.6L21.5 8H6"/></svg>
+            </div>
+            <p class="stat-value tabular">186</p>
+            <p class="stat-title">Orders Today</p>
+            <span class="stat-sub" style="color:#616161;">Avg basket ₱260</span>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:rgba(123,31,162,0.1);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#7B1FA2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>
+            </div>
+            <p class="stat-value tabular">1,248</p>
+            <p class="stat-title">Products in Stock</p>
+            <span class="stat-sub" style="color:#C62828;">14 low-stock alerts</span>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:rgba(0,131,143,0.1);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#00838F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <p class="stat-value tabular">22 / 26</p>
+            <p class="stat-title">Employees Present</p>
+            <span class="stat-sub" style="color:#616161;">4 on leave</span>
+          </div>
+        </div>
+
+        <div class="chart-row">
+          <div class="card">
+            <div class="card-head">
+              <p class="card-title">Revenue Trend</p>
+              <span class="card-period">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                This week
+              </span>
+            </div>
+            <canvas id="revenueChart" height="150"></canvas>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><p class="card-title">Sales by Category</p></div>
+            <div class="donut-wrap">
+              <div style="position:relative; width:150px; height:150px;">
+                <canvas id="categoryChart" width="150" height="150"></canvas>
+                <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                  <span class="donut-center-value tabular">₱48.3K</span>
+                  <span class="donut-center-label">Total</span>
+                </div>
+              </div>
+              <div class="legend">
+                <div class="legend-row"><span class="legend-dot" style="background:#C62828;"></span><span class="legend-label">Groceries &amp; Canned</span><span class="legend-val tabular">36%</span></div>
+                <div class="legend-row"><span class="legend-dot" style="background:#FEB300;"></span><span class="legend-label">Beverages</span><span class="legend-val tabular">24%</span></div>
+                <div class="legend-row"><span class="legend-dot" style="background:#006AB8;"></span><span class="legend-label">Frozen &amp; Dairy</span><span class="legend-val tabular">18%</span></div>
+                <div class="legend-row"><span class="legend-dot" style="background:#7B1FA2;"></span><span class="legend-label">Snacks</span><span class="legend-val tabular">14%</span></div>
+                <div class="legend-row"><span class="legend-dot" style="background:#00838F;"></span><span class="legend-label">Household</span><span class="legend-val tabular">8%</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bottom-row">
+          <div class="card">
+            <div class="card-head"><p class="card-title">Top Products This Week</p><span class="view-all" onclick="showPage('inventory')">View all</span></div>
+            <div class="lb-row"><span class="lb-rank tabular">1</span><div class="lb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="2.5"/></svg></div><div><p class="lb-name">Jasmine Rice 5kg</p><p class="lb-meta">312 units sold</p></div><span class="lb-value tabular">₱18,720</span></div>
+            <div class="lb-row"><span class="lb-rank tabular">2</span><div class="lb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2h8l1 4H7l1-4Z"/><path d="M6 6h12l-1 15a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 6Z"/></svg></div><div><p class="lb-name">Bottled Water 1L</p><p class="lb-meta">480 units sold</p></div><span class="lb-value tabular">₱9,600</span></div>
+            <div class="lb-row"><span class="lb-rank tabular">3</span><div class="lb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div><div><p class="lb-name">Canned Sardines</p><p class="lb-meta">265 units sold</p></div><span class="lb-value tabular">₱7,950</span></div>
+            <div class="lb-row"><span class="lb-rank tabular">4</span><div class="lb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v4H3z"/><path d="M5 7v13a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7"/><path d="M10 11h4"/></svg></div><div><p class="lb-name">Cooking Oil 1L</p><p class="lb-meta">198 units sold</p></div><span class="lb-value tabular">₱6,930</span></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><p class="card-title">Recent Deliveries</p><span class="view-all" onclick="showPage('deliveries')">View all</span></div>
+            <table>
+              <thead><tr><th>Supplier</th><th>Items</th><th>Time</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td class="cell-strong">Golden Grain Traders</td><td>Rice, Cooking Oil (18 SKUs)</td><td class="tabular">7:40 AM</td><td><span class="pill pill-green"><span class="pill-dot"></span>Verified</span></td></tr>
+                <tr><td class="cell-strong">Sunrise Beverages Co.</td><td>Soft Drinks, Juice (9 SKUs)</td><td class="tabular">9:15 AM</td><td><span class="pill pill-amber"><span class="pill-dot"></span>Pending</span></td></tr>
+                <tr><td class="cell-strong">Coldline Dairy &amp; Frozen</td><td>Dairy, Frozen Goods (12 SKUs)</td><td class="tabular">10:05 AM</td><td><span class="pill pill-red"><span class="pill-dot"></span>2 short</span></td></tr>
+                <tr><td class="cell-strong">Manila Snacks Distribution</td><td>Chips, Biscuits (24 SKUs)</td><td class="tabular">11:30 AM</td><td><span class="pill pill-green"><span class="pill-dot"></span>Verified</span></td></tr>
+                <tr><td class="cell-strong">CleanHome Supplies Inc.</td><td>Detergent, Soap (7 SKUs)</td><td class="tabular">1:20 PM</td><td><span class="pill pill-amber"><span class="pill-dot"></span>Pending</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= INVENTORY ================= -->
+      <section class="page" id="page-inventory">
+        <div class="page-head">
+          <div><p class="page-title">Inventory</p><p class="page-sub">1,248 products across 5 categories · 14 need reordering</p></div>
+          <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Add Product</button>
+        </div>
+        <div class="chip-row">
+          <button class="chip selected">All</button>
+          <button class="chip">Groceries &amp; Canned</button>
+          <button class="chip">Beverages</button>
+          <button class="chip">Frozen &amp; Dairy</button>
+          <button class="chip">Snacks</button>
+          <button class="chip">Household</button>
+        </div>
+        <div class="card">
+          <table>
+            <thead><tr><th>Product</th><th>SKU</th><th>Category</th><th>Stock</th><th>Unit Price</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td class="cell-strong">Jasmine Rice 5kg</td><td class="tabular">BC-1042</td><td>Groceries</td><td class="tabular">184</td><td class="tabular">₱310.00</td><td><span class="pill pill-green"><span class="pill-dot"></span>In Stock</span></td></tr>
+              <tr><td class="cell-strong">Cooking Oil 1L</td><td class="tabular">BC-1108</td><td>Groceries</td><td class="tabular">96</td><td class="tabular">₱135.00</td><td><span class="pill pill-green"><span class="pill-dot"></span>In Stock</span></td></tr>
+              <tr><td class="cell-strong">Canned Sardines 155g</td><td class="tabular">BC-1155</td><td>Groceries</td><td class="tabular">22</td><td class="tabular">₱28.50</td><td><span class="pill pill-amber"><span class="pill-dot"></span>Low Stock</span></td></tr>
+              <tr><td class="cell-strong">Bottled Water 1L</td><td class="tabular">BC-2011</td><td>Beverages</td><td class="tabular">310</td><td class="tabular">₱20.00</td><td><span class="pill pill-green"><span class="pill-dot"></span>In Stock</span></td></tr>
+              <tr><td class="cell-strong">Powdered Juice Drink 25g</td><td class="tabular">BC-2044</td><td>Beverages</td><td class="tabular">14</td><td class="tabular">₱7.00</td><td><span class="pill pill-amber"><span class="pill-dot"></span>Low Stock</span></td></tr>
+              <tr><td class="cell-strong">Full Cream Milk 1L</td><td class="tabular">BC-3021</td><td>Frozen &amp; Dairy</td><td class="tabular">0</td><td class="tabular">₱98.00</td><td><span class="pill pill-red"><span class="pill-dot"></span>Out of Stock</span></td></tr>
+              <tr><td class="cell-strong">Frozen Chicken 1kg</td><td class="tabular">BC-3077</td><td>Frozen &amp; Dairy</td><td class="tabular">58</td><td class="tabular">₱185.00</td><td><span class="pill pill-green"><span class="pill-dot"></span>In Stock</span></td></tr>
+              <tr><td class="cell-strong">Potato Chips 60g</td><td class="tabular">BC-4013</td><td>Snacks</td><td class="tabular">142</td><td class="tabular">₱35.00</td><td><span class="pill pill-green"><span class="pill-dot"></span>In Stock</span></td></tr>
+              <tr><td class="cell-strong">Assorted Biscuits 200g</td><td class="tabular">BC-4056</td><td>Snacks</td><td class="tabular">19</td><td class="tabular">₱52.00</td><td><span class="pill pill-amber"><span class="pill-dot"></span>Low Stock</span></td></tr>
+              <tr><td class="cell-strong">Laundry Detergent 1kg</td><td class="tabular">BC-5019</td><td>Household</td><td class="tabular">64</td><td class="tabular">₱112.00</td><td><span class="pill pill-green"><span class="pill-dot"></span>In Stock</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================= DELIVERIES ================= -->
+      <section class="page" id="page-deliveries">
+        <div class="page-head">
+          <div><p class="page-title">Deliveries</p><p class="page-sub">7 deliveries logged today</p></div>
+          <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>New Delivery</button>
+        </div>
+        <div class="chip-row">
+          <button class="chip selected">All</button>
+          <button class="chip">Verified</button>
+          <button class="chip">Pending</button>
+          <button class="chip">Discrepancy</button>
+        </div>
+        <div class="card">
+          <table>
+            <thead><tr><th>Supplier</th><th>Date</th><th>Items</th><th>Received By</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td class="cell-strong">Golden Grain Traders</td><td class="tabular">Sep 10</td><td>18 SKUs</td><td>R. Santos</td><td><span class="pill pill-green"><span class="pill-dot"></span>Verified</span></td></tr>
+              <tr><td class="cell-strong">Sunrise Beverages Co.</td><td class="tabular">Sep 10</td><td>9 SKUs</td><td>J. Ramos</td><td><span class="pill pill-amber"><span class="pill-dot"></span>Pending</span></td></tr>
+              <tr><td class="cell-strong">Coldline Dairy &amp; Frozen</td><td class="tabular">Sep 10</td><td>12 SKUs</td><td>R. Santos</td><td><span class="pill pill-red"><span class="pill-dot"></span>2 short</span></td></tr>
+              <tr><td class="cell-strong">Manila Snacks Distribution</td><td class="tabular">Sep 10</td><td>24 SKUs</td><td>M. Cruz</td><td><span class="pill pill-green"><span class="pill-dot"></span>Verified</span></td></tr>
+              <tr><td class="cell-strong">CleanHome Supplies Inc.</td><td class="tabular">Sep 10</td><td>7 SKUs</td><td>J. Ramos</td><td><span class="pill pill-amber"><span class="pill-dot"></span>Pending</span></td></tr>
+              <tr><td class="cell-strong">Golden Grain Traders</td><td class="tabular">Sep 9</td><td>15 SKUs</td><td>R. Santos</td><td><span class="pill pill-green"><span class="pill-dot"></span>Verified</span></td></tr>
+              <tr><td class="cell-strong">Sunrise Beverages Co.</td><td class="tabular">Sep 8</td><td>11 SKUs</td><td>M. Cruz</td><td><span class="pill pill-green"><span class="pill-dot"></span>Verified</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================= ATTENDANCE ================= -->
+      <section class="page" id="page-attendance">
+        <div class="page-head">
+          <div><p class="page-title">Attendance</p><p class="page-sub">Thursday, September 10 · RFID log</p></div>
+          <button class="btn btn-outlined"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Change Date</button>
+        </div>
+        <div class="mini-stat-row">
+          <div class="mini-stat"><p class="mini-stat-value tabular" style="color:#2E7D32;">22</p><p class="mini-stat-label">Present</p></div>
+          <div class="mini-stat"><p class="mini-stat-value tabular" style="color:#F57F17;">3</p><p class="mini-stat-label">Late</p></div>
+          <div class="mini-stat"><p class="mini-stat-value tabular" style="color:#C62828;">1</p><p class="mini-stat-label">Absent</p></div>
+          <div class="mini-stat"><p class="mini-stat-value tabular" style="color:#616161;">3</p><p class="mini-stat-label">On Leave</p></div>
+        </div>
+        <div class="card">
+          <table>
+            <thead><tr><th>Employee</th><th>Role</th><th>Time In</th><th>Time Out</th><th>Total Hours</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td class="cell-strong">Rico Santos</td><td>Bodegero</td><td class="tabular">7:58 AM</td><td class="tabular">5:02 PM</td><td class="tabular">9.1</td><td><span class="pill pill-green"><span class="pill-dot"></span>On Time</span></td></tr>
+              <tr><td class="cell-strong">Joy Ramos</td><td>Delivery Checker</td><td class="tabular">8:12 AM</td><td class="tabular">5:00 PM</td><td class="tabular">8.8</td><td><span class="pill pill-amber"><span class="pill-dot"></span>Late 12m</span></td></tr>
+              <tr><td class="cell-strong">Mika Cruz</td><td>Cashier</td><td class="tabular">7:55 AM</td><td class="tabular">4:58 PM</td><td class="tabular">9.0</td><td><span class="pill pill-green"><span class="pill-dot"></span>On Time</span></td></tr>
+              <tr><td class="cell-strong">Ben Torres</td><td>Bagger</td><td class="tabular">8:20 AM</td><td class="tabular">—</td><td class="tabular">—</td><td><span class="pill pill-blue"><span class="pill-dot"></span>In Progress</span></td></tr>
+              <tr><td class="cell-strong">Liza Fernandez</td><td>Merchandiser</td><td class="tabular">—</td><td class="tabular">—</td><td class="tabular">—</td><td><span class="pill pill-red"><span class="pill-dot"></span>Absent</span></td></tr>
+              <tr><td class="cell-strong">Carlo Reyes</td><td>Manager</td><td class="tabular">7:50 AM</td><td class="tabular">6:10 PM</td><td class="tabular">10.3</td><td><span class="pill pill-green"><span class="pill-dot"></span>On Time</span></td></tr>
+              <tr><td class="cell-strong">Grace Villanueva</td><td>Cashier</td><td class="tabular">—</td><td class="tabular">—</td><td class="tabular">—</td><td><span class="pill pill-grey"><span class="pill-dot"></span>On Leave</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================= EMPLOYEES ================= -->
+      <section class="page" id="page-employees">
+        <div class="page-head">
+          <div><p class="page-title">Employees</p><p class="page-sub">26 team members across 7 roles</p></div>
+          <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Add Employee</button>
+        </div>
+        <div class="chip-row">
+          <button class="chip selected">All</button>
+          <button class="chip">Manager</button>
+          <button class="chip">Cashier</button>
+          <button class="chip">Bagger</button>
+          <button class="chip">Bodegero</button>
+          <button class="chip">Delivery Checker</button>
+          <button class="chip">Merchandiser</button>
+        </div>
+        <div class="emp-grid">
+          <div class="emp-card"><div class="emp-top"><div class="emp-avatar" style="background:#C62828;">CR</div><div><p class="emp-name">Carlo Reyes</p><span class="emp-role" style="background:rgba(198,40,40,0.1); color:#C62828;">Manager</span></div></div><div class="emp-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.99.36 1.96.68 2.9a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.18-1.25a2 2 0 0 1 2.11-.45c.94.32 1.91.55 2.9.68A2 2 0 0 1 22 16.92Z"/></svg>0917 200 4471</div><div class="emp-status"><span class="emp-status-dot"></span>Active · 3 yrs tenure</div></div>
+          <div class="emp-card"><div class="emp-top"><div class="emp-avatar" style="background:#00838F;">MC</div><div><p class="emp-name">Mika Cruz</p><span class="emp-role" style="background:rgba(0,131,143,0.12); color:#00838F;">Cashier</span></div></div><div class="emp-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.99.36 1.96.68 2.9a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.18-1.25a2 2 0 0 1 2.11-.45c.94.32 1.91.55 2.9.68A2 2 0 0 1 22 16.92Z"/></svg>0918 335 2290</div><div class="emp-status"><span class="emp-status-dot"></span>Active · 1.5 yrs tenure</div></div>
+          <div class="emp-card"><div class="emp-top"><div class="emp-avatar" style="background:#7B1FA2;">BT</div><div><p class="emp-name">Ben Torres</p><span class="emp-role" style="background:rgba(123,31,162,0.1); color:#7B1FA2;">Bagger</span></div></div><div class="emp-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.99.36 1.96.68 2.9a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.18-1.25a2 2 0 0 1 2.11-.45c.94.32 1.91.55 2.9.68A2 2 0 0 1 22 16.92Z"/></svg>0920 118 7734</div><div class="emp-status"><span class="emp-status-dot"></span>Active · 8 mos tenure</div></div>
+          <div class="emp-card"><div class="emp-top"><div class="emp-avatar" style="background:#F57F17;">RS</div><div><p class="emp-name">Rico Santos</p><span class="emp-role" style="background:rgba(254,179,0,0.18); color:#F57F17;">Bodegero</span></div></div><div class="emp-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.99.36 1.96.68 2.9a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.18-1.25a2 2 0 0 1 2.11-.45c.94.32 1.91.55 2.9.68A2 2 0 0 1 22 16.92Z"/></svg>0917 664 9012</div><div class="emp-status"><span class="emp-status-dot"></span>Active · 2 yrs tenure</div></div>
+          <div class="emp-card"><div class="emp-top"><div class="emp-avatar" style="background:#006AB8;">JR</div><div><p class="emp-name">Joy Ramos</p><span class="emp-role" style="background:rgba(0,106,184,0.1); color:#006AB8;">Delivery Checker</span></div></div><div class="emp-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.99.36 1.96.68 2.9a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.18-1.25a2 2 0 0 1 2.11-.45c.94.32 1.91.55 2.9.68A2 2 0 0 1 22 16.92Z"/></svg>0919 442 5580</div><div class="emp-status"><span class="emp-status-dot"></span>Active · 1 yr tenure</div></div>
+          <div class="emp-card"><div class="emp-top"><div class="emp-avatar" style="background:#2E7D32;">LF</div><div><p class="emp-name">Liza Fernandez</p><span class="emp-role" style="background:rgba(46,125,50,0.12); color:#2E7D32;">Merchandiser</span></div></div><div class="emp-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.99.36 1.96.68 2.9a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.18-1.25a2 2 0 0 1 2.11-.45c.94.32 1.91.55 2.9.68A2 2 0 0 1 22 16.92Z"/></svg>0921 887 3346</div><div class="emp-status" style="color:#C62828;"><span class="emp-status-dot" style="background:#C62828;"></span>Absent today</div></div>
+        </div>
+      </section>
+
+      <!-- ================= PAYROLL ================= -->
+      <section class="page" id="page-payroll">
+        <div class="page-head">
+          <div><p class="page-title">Payroll</p><p class="page-sub">Pay period: Aug 26 – Sep 9, 2026</p></div>
+          <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Run Payroll</button>
+        </div>
+        <div class="mini-stat-row">
+          <div class="mini-stat"><p class="mini-stat-value tabular">₱312,480</p><p class="mini-stat-label">Total Payroll</p></div>
+          <div class="mini-stat"><p class="mini-stat-value tabular">26</p><p class="mini-stat-label">Employees</p></div>
+          <div class="mini-stat"><p class="mini-stat-value tabular" style="color:#F57F17;">6</p><p class="mini-stat-label">Pending Payslips</p></div>
+          <div class="mini-stat"><p class="mini-stat-value tabular">₱12,018</p><p class="mini-stat-label">Average Net Pay</p></div>
+        </div>
+        <div class="card">
+          <table>
+            <thead><tr><th>Employee</th><th>Role</th><th>Gross Pay</th><th>Deductions</th><th>Net Pay</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td class="cell-strong">Carlo Reyes</td><td>Manager</td><td class="tabular">₱18,500</td><td class="tabular">₱1,850</td><td class="tabular">₱16,650</td><td><span class="pill pill-green"><span class="pill-dot"></span>Paid</span></td></tr>
+              <tr><td class="cell-strong">Mika Cruz</td><td>Cashier</td><td class="tabular">₱10,400</td><td class="tabular">₱980</td><td class="tabular">₱9,420</td><td><span class="pill pill-green"><span class="pill-dot"></span>Paid</span></td></tr>
+              <tr><td class="cell-strong">Rico Santos</td><td>Bodegero</td><td class="tabular">₱10,800</td><td class="tabular">₱1,020</td><td class="tabular">₱9,780</td><td><span class="pill pill-green"><span class="pill-dot"></span>Paid</span></td></tr>
+              <tr><td class="cell-strong">Joy Ramos</td><td>Delivery Checker</td><td class="tabular">₱10,600</td><td class="tabular">₱990</td><td class="tabular">₱9,610</td><td><span class="pill pill-amber"><span class="pill-dot"></span>Pending</span></td></tr>
+              <tr><td class="cell-strong">Ben Torres</td><td>Bagger</td><td class="tabular">₱9,200</td><td class="tabular">₱830</td><td class="tabular">₱8,370</td><td><span class="pill pill-amber"><span class="pill-dot"></span>Pending</span></td></tr>
+              <tr><td class="cell-strong">Liza Fernandez</td><td>Merchandiser</td><td class="tabular">₱9,600</td><td class="tabular">₱865</td><td class="tabular">₱8,735</td><td><span class="pill pill-amber"><span class="pill-dot"></span>Pending</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================= REPORTS ================= -->
+      <section class="page" id="page-reports">
+        <div class="page-head">
+          <div><p class="page-title">Reports</p><p class="page-sub">Generate and export operational reports</p></div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-head">
+            <p class="card-title">Weekly Sales</p>
+            <span class="card-period"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>Last 7 days</span>
+          </div>
+          <canvas id="reportsBarChart" height="90"></canvas>
+        </div>
+
+        <div class="report-grid">
+          <div class="report-card">
+            <div class="report-icon" style="background:rgba(198,40,40,0.1);"><svg viewBox="0 0 24 24" fill="none" stroke="#C62828" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18.4 5.2 12 11.6l-2.5-2.5L5 13.6"/></svg></div>
+            <p class="report-title">Sales Report</p>
+            <p class="report-desc">Daily and weekly revenue, order volume, and basket size, broken down by category.</p>
+            <button class="btn btn-outlined">Generate</button>
+          </div>
+          <div class="report-card">
+            <div class="report-icon" style="background:rgba(123,31,162,0.1);"><svg viewBox="0 0 24 24" fill="none" stroke="#7B1FA2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg></div>
+            <p class="report-title">Inventory Report</p>
+            <p class="report-desc">Stock levels, reorder alerts, and shrinkage across every product category.</p>
+            <button class="btn btn-outlined">Generate</button>
+          </div>
+          <div class="report-card">
+            <div class="report-icon" style="background:rgba(0,131,143,0.1);"><svg viewBox="0 0 24 24" fill="none" stroke="#00838F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg></div>
+            <p class="report-title">Attendance Report</p>
+            <p class="report-desc">Time-in/out records, lateness, undertime, and overtime by employee and role.</p>
+            <button class="btn btn-outlined">Generate</button>
+          </div>
+          <div class="report-card">
+            <div class="report-icon" style="background:rgba(254,179,0,0.18);"><svg viewBox="0 0 24 24" fill="none" stroke="#F57F17" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/></svg></div>
+            <p class="report-title">Payroll Summary</p>
+            <p class="report-desc">Gross pay, deductions, and net pay totals for any completed pay period.</p>
+            <button class="btn btn-outlined">Generate</button>
+          </div>
+          <div class="report-card">
+            <div class="report-icon" style="background:rgba(0,106,184,0.1);"><svg viewBox="0 0 24 24" fill="none" stroke="#006AB8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/></svg></div>
+            <p class="report-title">Employee Performance</p>
+            <p class="report-desc">Attendance consistency and task completion, ranked by role.</p>
+            <button class="btn btn-outlined">Generate</button>
+          </div>
+          <div class="report-card">
+            <div class="report-icon" style="background:rgba(46,125,50,0.12);"><svg viewBox="0 0 24 24" fill="none" stroke="#2E7D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="6" width="15" height="12" rx="1.5"/><path d="M16 10h3.6a1 1 0 0 1 .9.55L22 14v4h-2"/></svg></div>
+            <p class="report-title">Delivery Report</p>
+            <p class="report-desc">Supplier reliability, on-time rate, and discrepancy history by vendor.</p>
+            <button class="btn btn-outlined">Generate</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= SETTINGS ================= -->
+      <section class="page" id="page-settings">
+        <div class="page-head"><div><p class="page-title">Settings</p><p class="page-sub">Manage store details, notifications, and access</p></div></div>
+
+        <div class="stack">
+          <div class="card">
+            <div class="card-head"><p class="card-title">General</p></div>
+            <div class="field-grid-2">
+              <div class="field-group"><label class="field-label">Store Name</label><input class="field-input" value="Baycel Growcery" /></div>
+              <div class="field-group"><label class="field-label">Branch / Address</label><input class="field-input" value="Santa Cruz, Calabarzon" /></div>
+              <div class="field-group"><label class="field-label">Currency</label><input class="field-input" value="PHP (₱)" /></div>
+              <div class="field-group"><label class="field-label">Timezone</label><input class="field-input" value="Asia/Manila (GMT+8)" /></div>
+            </div>
+            <button class="btn btn-primary">Save Changes</button>
+          </div>
+
+          <div class="two-col">
+            <div class="card">
+              <div class="card-head"><p class="card-title">Notifications</p></div>
+              <div class="settings-row"><div><p class="settings-row-title">Low-stock alerts</p><p class="settings-row-desc">Notify when a product drops below reorder level</p></div><label class="toggle"><input type="checkbox" checked/><span class="toggle-track"></span></label></div>
+              <div class="settings-row"><div><p class="settings-row-title">Delivery discrepancies</p><p class="settings-row-desc">Notify when a received delivery is short or damaged</p></div><label class="toggle"><input type="checkbox" checked/><span class="toggle-track"></span></label></div>
+              <div class="settings-row"><div><p class="settings-row-title">Payroll reminders</p><p class="settings-row-desc">Remind before each pay period closes</p></div><label class="toggle"><input type="checkbox" checked/><span class="toggle-track"></span></label></div>
+              <div class="settings-row"><div><p class="settings-row-title">Attendance anomalies</p><p class="settings-row-desc">Notify on unregistered RFID taps or missed time-outs</p></div><label class="toggle"><input type="checkbox"/><span class="toggle-track"></span></label></div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><p class="card-title">Security</p></div>
+              <div class="field-group"><label class="field-label">Current Password</label><input class="field-input" type="password" value="••••••••" /></div>
+              <div class="field-group"><label class="field-label">New Password</label><input class="field-input" type="password" placeholder="Enter new password" /></div>
+              <div class="field-group"><label class="field-label">Confirm New Password</label><input class="field-input" type="password" placeholder="Re-enter new password" /></div>
+              <button class="btn btn-outlined">Update Password</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><p class="card-title">Roles &amp; Permissions</p></div>
+            <div class="role-row"><span class="role-dot" style="background:#C62828;"></span><span class="role-name">Owner</span><span class="role-access">Full access to all modules</span></div>
+            <div class="role-row"><span class="role-dot" style="background:#EF9A9A;"></span><span class="role-name">Manager</span><span class="role-access">Inventory, delivery, reports · attendance &amp; HR view-only</span></div>
+            <div class="role-row"><span class="role-dot" style="background:#00838F;"></span><span class="role-name">Cashier</span><span class="role-access">Sales submission, own attendance</span></div>
+            <div class="role-row"><span class="role-dot" style="background:#7B1FA2;"></span><span class="role-name">Bagger</span><span class="role-access">Own attendance, absence forms</span></div>
+            <div class="role-row"><span class="role-dot" style="background:#F57F17;"></span><span class="role-name">Bodegero</span><span class="role-access">Inventory, delivery receiving, own attendance</span></div>
+            <div class="role-row"><span class="role-dot" style="background:#006AB8;"></span><span class="role-name">Delivery Checker</span><span class="role-access">Inventory, delivery, own attendance</span></div>
+            <div class="role-row"><span class="role-dot" style="background:#2E7D32;"></span><span class="role-name">Merchandiser</span><span class="role-access">Stock-out for assigned products, own attendance</span></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<div class="bottom-nav" id="bottomNav">
+  <div class="bn-item active" data-page="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Home</div>
+  <div class="bn-item" data-page="inventory"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>Stock</div>
+  <div class="bn-item" data-page="deliveries"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="6" width="15" height="12" rx="1.5"/><path d="M16 10h3.6a1 1 0 0 1 .9.55L22 14v4h-2"/><circle cx="6" cy="18.5" r="1.6"/><circle cx="17.5" cy="18.5" r="1.6"/></svg>Delivery</div>
+  <div class="bn-item" data-page="attendance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg>Time</div>
+  <div class="bn-item" data-page="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>Me</div>
+</div>
+
+<script>
+  function showPage(id){
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + id).classList.add('active');
+    document.querySelectorAll('#sideNav .nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === id));
+    document.querySelectorAll('#bottomNav .bn-item').forEach(n => n.classList.toggle('active', n.dataset.page === id));
+    window.scrollTo(0,0);
+  }
+  document.querySelectorAll('#sideNav .nav-item[data-page]').forEach(el => el.addEventListener('click', () => showPage(el.dataset.page)));
+  document.querySelectorAll('#bottomNav .bn-item[data-page]').forEach(el => el.addEventListener('click', () => showPage(el.dataset.page)));
+
+  document.querySelectorAll('.chip-row').forEach(row => {
+    row.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        row.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+      });
+    });
+  });
+
+  // Revenue trend
+  const revCtx = document.getElementById('revenueChart').getContext('2d');
+  const grad = revCtx.createLinearGradient(0, 0, 0, 180);
+  grad.addColorStop(0, 'rgba(198,40,40,0.20)');
+  grad.addColorStop(1, 'rgba(198,40,40,0)');
+  new Chart(revCtx, {
+    type: 'line',
+    data: {
+      labels: ['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'],
+      datasets: [{ data: [36200, 41500, 52800, 33900, 38700, 45100, 48320], borderColor: '#C62828', backgroundColor: grad, fill: true, tension: 0.35, pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: '#C62828', pointHoverBorderColor: '#fff', pointHoverBorderWidth: 2, borderWidth: 2.5 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { backgroundColor: '#fff', titleColor: '#1C1B1F', bodyColor: '#1C1B1F', borderColor: '#E0E0E0', borderWidth: 1, padding: 10, cornerRadius: 4, displayColors: false, callbacks: { label: (ctx) => '₱' + ctx.parsed.y.toLocaleString() } } },
+      scales: { x: { grid: { display: false }, ticks: { color: '#616161', font: { family: 'Inter', size: 11 } } }, y: { grid: { color: 'rgba(224,224,224,0.5)' }, border: { display: false }, ticks: { color: '#616161', font: { family: 'Inter', size: 11 }, callback: (v) => '₱' + (v/1000) + 'k' } } }
+    }
+  });
+
+  // Category donut
+  new Chart(document.getElementById('categoryChart').getContext('2d'), {
+    type: 'doughnut',
+    data: { labels: ['Groceries & Canned', 'Beverages', 'Frozen & Dairy', 'Snacks', 'Household'], datasets: [{ data: [36, 24, 18, 14, 8], backgroundColor: ['#C62828', '#FEB300', '#006AB8', '#7B1FA2', '#00838F'], borderWidth: 2, borderColor: '#FFFFFF' }] },
+    options: { responsive: true, maintainAspectRatio: true, cutout: '72%', plugins: { legend: { display: false }, tooltip: { enabled: false } } }
+  });
+
+  // Reports weekly bar chart
+  new Chart(document.getElementById('reportsBarChart').getContext('2d'), {
+    type: 'bar',
+    data: { labels: ['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'], datasets: [{ data: [36200, 41500, 52800, 33900, 38700, 45100, 48320], backgroundColor: '#C62828', borderRadius: 4, maxBarThickness: 34 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { backgroundColor: '#fff', titleColor: '#1C1B1F', bodyColor: '#1C1B1F', borderColor: '#E0E0E0', borderWidth: 1, padding: 10, cornerRadius: 4, displayColors: false, callbacks: { label: (ctx) => '₱' + ctx.parsed.y.toLocaleString() } } },
+      scales: { x: { grid: { display: false }, ticks: { color: '#616161', font: { family: 'Inter', size: 11 } } }, y: { grid: { color: 'rgba(224,224,224,0.5)' }, border: { display: false }, ticks: { color: '#616161', font: { family: 'Inter', size: 11 }, callback: (v) => '₱' + (v/1000) + 'k' } } }
+    }
+  });
+</script>
+
+</body>
+</html>

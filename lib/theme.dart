@@ -104,6 +104,24 @@ class BaycelTypography {
     color: BaycelColors.textPrimary,
   );
 
+  // Body MD+ (user name, card values)
+  static final TextStyle bodyMd = TextStyle(
+    fontFamily: 'Inter',
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    height: 1.4,
+    color: BaycelColors.textPrimary,
+  );
+
+  // Title LG (section titles, nav headers)
+  static final TextStyle titleLg = TextStyle(
+    fontFamily: 'Inter',
+    fontSize: 15,
+    fontWeight: FontWeight.w600,
+    height: 1.3,
+    color: BaycelColors.textPrimary,
+  );
+
   // Label MD
   static final TextStyle label = TextStyle(
     fontFamily: 'Inter',
@@ -111,6 +129,25 @@ class BaycelTypography {
     fontWeight: FontWeight.w600,
     height: 1.3,
     letterSpacing: 0.02,
+    color: BaycelColors.textPrimary,
+  );
+
+  // Body XS (tiny labels, pills)
+  static final TextStyle bodyXs = TextStyle(
+    fontFamily: 'Inter',
+    fontSize: 10,
+    fontWeight: FontWeight.w400,
+    height: 1.3,
+    color: BaycelColors.textPrimary,
+  );
+
+  // Label XS (pill text, micro labels)
+  static final TextStyle labelXs = TextStyle(
+    fontFamily: 'Inter',
+    fontSize: 10.5,
+    fontWeight: FontWeight.w500,
+    height: 1.3,
+    letterSpacing: 0.03,
     color: BaycelColors.textPrimary,
   );
 
@@ -145,6 +182,12 @@ class BaycelSpacing {
   static const lg = 24.0; // 24px
   static const xl = 32.0; // 32px
   static const xxl = 48.0; // 48px
+
+  // Component-specific
+  static const dot = 5.0; // pill/status dots
+  static const cellVertical = 9.0; // table row / summary row padding
+  static const buttonVertical = 14.0; // action button vertical padding
+  static const buttonHorizontal = 18.0; // action button horizontal padding
 }
 
 class BaycelRadius {

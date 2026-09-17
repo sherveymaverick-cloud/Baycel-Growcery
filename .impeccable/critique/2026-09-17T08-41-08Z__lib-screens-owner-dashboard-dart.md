@@ -1,0 +1,135 @@
+---
+target: lib (full app)
+total_score: 33.5
+max_score: 40
+na_heuristics: 
+p0_count: 0
+p1_count: 2
+p2_count: 2
+p3_count: 1
+target_identity: "file:C:\\Users\\Shervey Quiap\\Desktop\\finalproject-baycel\\lib\\screens\\owner_dashboard.dart"
+target_fingerprint: "sha256:c53b78a5d3eb7f87ac203f6995164d0d0425f69e9d1b1ed0bd4b0e77883a3bbb"
+target_path: "C:\\Users\\Shervey Quiap\\Desktop\\finalproject-baycel\\lib\\screens\\owner_dashboard.dart"
+timestamp: 2026-09-17T08-41-08Z
+slug: lib-screens-owner-dashboard-dart
+---
+Method: dual-agent (A: ses_f517b1d22ffexVUUhG2oYlLZoe · B: ses_f517b12e3ffe9eO1NOoP2So6MO)
+
+---
+
+## Design Health Score
+
+| # | Heuristic | Score | Key Issue |
+|---|-----------|-------|-----------|
+| 1 | Visibility of System Status | 4 | StreamBuilders + skeleton loaders + empty states + snackbar feedback on all actions |
+| 2 | Match Between System and Real World | 3.5 | Filipino role names, ₱ peso, shift labels match operations. Minor: "Encode Delivery" is Filipino-English |
+| 3 | User Control and Freedom | 3.5 | Undo on payroll, cancel on dialogs, confirmation on destructive actions |
+| 4 | Consistency and Standards | 3 | Token system consistent, pill standardization done. But 35+ magic numbers break the token contract |
+| 5 | Error Prevention | 3.5 | Confirmation dialogs, required field checks, cash shortage confirmation |
+| 6 | Recognition Rather Than Recall | 4 | Status pills color-code, icons match context, pending counts inline, empty states guide next action |
+| 7 | Flexibility and Efficiency of Use | 3 | Search navigation, role routing, filter chips. No section jumps, dead "View all" links |
+| 8 | Aesthetic and Minimalist Design | 3 | Clean cards, consistent spacing. Owner dashboard dense, revenue chart misleading |
+| 9 | Error Recovery | 3.5 | SnackBar errors with retry guidance. Minor: some errors don't explain what went wrong |
+| 10 | Help and Documentation | 2.5 | Role tooltips, inline hints. No onboarding, no help screen, settings toggles undocumented |
+| **Total** | | **33.5/40** | **Good** |
+
+---
+
+## Design Specificity Verdict
+
+**LLM:** Moderately authored for Baycel Growcery. Filipino retail context is clear: ₱ currency, role names like Bodegero and Bagger, morning/afternoon shift labels, attendance mechanics matching Philippine store operations. The crimson palette with marigold warning is a deliberate brand choice. Floor staff dashboards carry genuine identity — the crimson gradient ClockCard, role-specific workflows, and delivery checker TabBar are authored decisions. The design system is professional (tokens, shadows, radii, component styles) but 35+ magic numbers dilute its authority. The owner dashboard's layout — stat grid, inline approvals, chart row, bottom product/delivery row — is a pattern any SaaS admin template could produce unchanged.
+
+**Verdict: B+.** Strong foundation with genuine product DNA in floor staff screens. Owner/manager screens need more authored identity.
+
+---
+
+## Overall Impression
+
+The fixes from this session show real design maturity. The pill standardization, notification removal, TabBar split, reports decoupling, and icon corrections all demonstrate systematic improvement. The score jumped from 25 → 33.5 — a significant leap. The biggest remaining opportunity is making the owner dashboard less of a scroll marathon and cleaning up the magic numbers that undermine the token system.
+
+---
+
+## What's Working
+
+1. **Token system with real authority** — `theme.dart` is a proper design system: colors, typography scale, spacing, radius, shadows, component styles. `BaycelComponents.card`, `buttonPrimary`, `input` are used consistently across all screens.
+
+2. **Role-based architecture is the product's superpower** — Each floor staff role has a genuinely distinct workflow, not just role labels on a generic dashboard. The dispatch pattern is clean.
+
+3. **Fixed issues show design maturity** — Pill standardization, notification badge removal, TabBar split, reports decoupling, icon corrections, and stock chart rename all demonstrate the team listens to critique and acts on it systematically.
+
+---
+
+## Priority Issues
+
+### P1 — Magic Numbers Violate Token Contract (Consistency)
+- **What:** 35+ hardcoded pixel values and font sizes appear instead of using `BaycelSpacing` and `BaycelTypography` tokens
+- **Why it matters:** Makes the design system aspirational rather than authoritative. Inconsistent spacing creates visual noise.
+- **Fix:** Define missing typography tokens (`bodyXs` at 10, `bodyMd` at 13.5, `titleLg` at 15). Add `BaycelSpacing.xs` (5) and `BaycelSpacing.cellVertical` (9). Global replace pass.
+- **Suggested command:** `/impeccable layout`
+
+### P1 — Owner Dashboard Scroll Marathon (Cognitive Load)
+- **What:** 6 major sections stacked vertically: stats, absence approvals, cash advance approvals, charts, top products, recent deliveries
+- **Why it matters:** Casey (mobile user) must scroll extensively. No section jumps. "View all" links are dead.
+- **Fix:** Extract approvals to dedicated screens accessible via nav, or add summary cards with "View pending (3) →" navigation
+- **Suggested command:** `/impeccable distill`
+
+### P2 — `buildPill()` Helper Duplicates `BaycelPill`
+- **What:** `floor_staff_helpers.dart:9-22` duplicates `shared_widgets.dart:95-118`
+- **Why it matters:** Same class of issue fixed for status pills. Two implementations will drift.
+- **Fix:** Delete `buildPill()` from helpers. Replace all call sites with `BaycelPill`.
+- **Suggested command:** `/impeccable distill`
+
+### P2 — Revenue Trend Chart Uses Fake Multiplier
+- **What:** `owner_dashboard.dart:685` calculates revenue as `deliveryCount × ₱260`
+- **Why it matters:** Misleading — owner thinks this is real revenue data
+- **Fix:** Use actual sales data or label chart "Estimated Revenue (₱260/order)"
+- **Suggested command:** `/impeccable clarify`
+
+### P3 — Missing Tooltips on 7 Icon Buttons
+- **What:** Approve All buttons, notification icon, logout, add/remove item, status icons lack tooltips
+- **Why it matters:** Screen readers can't identify these controls
+- **Fix:** Add `tooltip:` parameter to all icon buttons
+- **Suggested command:** `/impeccable harden`
+
+---
+
+## Persona Red Flags
+
+### Alex (Power User) 🟡
+- Search bar and filter chips work well
+- Owner dashboard scroll marathon with no section jumps is frustrating
+- Dead "View all" links violate affordance expectations
+
+### Jordan (First-Timer) 🟢
+- Role-based routing means Jordan only sees relevant content
+- Skeleton loaders prevent confusion during loading
+- No onboarding flow — owner dashboard density could overwhelm on first visit
+
+### Casey (Distracted Mobile User) 🔴
+- Owner dashboard on mobile is extremely long — 6 sections stacking vertically
+- Attendance screen 8-column table will compress and become unreadable on mobile
+- Delivery checker TabBar has fixed 600px height that may overflow/underflow
+
+---
+
+## Minor Observations
+
+1. `DropdownButtonFormField` uses `initialValue` instead of `value` — works due to Flutter parameter forwarding but semantically incorrect
+2. Payroll calculation `deductions = basicPay * 0.1` is a hardcoded 10% — should be configurable
+3. "Top Products This Week" leaderboard sorts by stock quantity, not sales performance — misleading
+4. `_saveSettings()` fires on every toggle change with no debounce — 3 toggles = 3 rapid Firestore writes
+5. `StockLevelsCard` empty state still uses `Icons.shopping_cart_outlined` — verify this is intentional
+
+---
+
+## Questions to Consider
+
+1. Should absence and cash advance approvals live on the owner dashboard at all, or should the dashboard show summary cards with navigation to dedicated approval screens?
+2. Is the ₱260/order revenue multiplier based on real data, or should this chart pull from an actual sales collection?
+3. The attendance screen has 8 columns — on a 375px phone that's ~47px per column. Is a horizontal scroll, card-based mobile layout, or column collapse strategy needed?
+4. Should the search bar also search within screens (products, employees) or is screen-level navigation sufficient?
+
+---
+
+**Trend for `lib` (last 4 runs): 22 → 23 → 25 → 33.5 (out of 40)**
+Wrote `.impeccable/critique/2026-09-17T08-30-00Z__lib-screens-owner-dashboard-dart.md`.

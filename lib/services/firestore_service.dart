@@ -8,6 +8,7 @@ import '../models/attendance.dart';
 import '../models/absence_form.dart';
 import '../models/payroll.dart';
 import '../models/settings.dart';
+import '../models/cash_advance.dart';
 
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -21,6 +22,7 @@ class FirestoreService {
   late final CollectionReference _absenceForms = _firestore.collection('absence_forms');
   late final CollectionReference _payrolls = _firestore.collection('payrolls');
   late final CollectionReference _settings = _firestore.collection('settings');
+  late final CollectionReference _cashAdvances = _firestore.collection('cash_advances');
 
   // ── Users ──────────────────────────────────────────
 
@@ -70,6 +72,14 @@ class FirestoreService {
     return StoreUser.fromMap(doc.id, doc.data() as Map<String, dynamic>);
   }
 
+  Future<void> deleteUser(String uid) async {
+    try {
+      await _users.doc(uid).delete();
+    } catch (e) {
+      throw Exception('Failed to delete employee. Please try again.');
+    }
+  }
+
   // ── Products ──────────────────────────────────────
 
   Future<void> saveProduct(Product product) async {
@@ -104,6 +114,20 @@ class FirestoreService {
     return Product.fromMap(doc.id, doc.data() as Map<String, dynamic>);
   }
 
+  Future<Product?> getProductByBarcode(String barcode) async {
+    final snapshot = await _products.where('barcode', isEqualTo: barcode).limit(1).get();
+    if (snapshot.docs.isEmpty) return null;
+    final doc = snapshot.docs.first;
+    return Product.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+  }
+
+  Future<Product?> getProductBySku(String sku) async {
+    final snapshot = await _products.where('sku', isEqualTo: sku).limit(1).get();
+    if (snapshot.docs.isEmpty) return null;
+    final doc = snapshot.docs.first;
+    return Product.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+  }
+
   // ── Stock Movements ──────────────────────────────
 
   Future<void> addStockMovement(StockMovement movement) async {
@@ -112,6 +136,16 @@ class FirestoreService {
 
   Stream<List<StockMovement>> getStockMovements() {
     return _stockMovements
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => StockMovement.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+            .toList());
+  }
+
+  Stream<List<StockMovement>> getStockMovementsByUser(String userId) {
+    return _stockMovements
+        .where('performedBy', isEqualTo: userId)
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
@@ -156,6 +190,15 @@ class FirestoreService {
     }
   }
 
+  Future<String> addAttendanceAndReturnId(AttendanceRecord record) async {
+    try {
+      final doc = await _attendance.add(record.toMap());
+      return doc.id;
+    } catch (e) {
+      throw Exception('Failed to record attendance. Please try again.');
+    }
+  }
+
   Future<void> updateAttendance(String id, Map<String, dynamic> data) async {
     try {
       await _attendance.doc(id).update(data);
@@ -177,6 +220,19 @@ class FirestoreService {
     final query = await _attendance
         .where('employeeId', isEqualTo: employeeId)
         .orderBy('date', descending: true)
+        .limit(1)
+        .get();
+    if (query.docs.isEmpty) return null;
+    final doc = query.docs.first;
+    return AttendanceRecord.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+  }
+
+  Future<AttendanceRecord?> getTodaysAttendance(String employeeId) async {
+    final today = DateTime.now();
+    final dateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    final query = await _attendance
+        .where('employeeId', isEqualTo: employeeId)
+        .where('date', isEqualTo: dateStr)
         .limit(1)
         .get();
     if (query.docs.isEmpty) return null;
@@ -229,6 +285,14 @@ class FirestoreService {
     }
   }
 
+  Future<void> updatePayroll(String id, Map<String, dynamic> data) async {
+    try {
+      await _payrolls.doc(id).update(data);
+    } catch (e) {
+      throw Exception('Failed to update payroll record.');
+    }
+  }
+
   Stream<List<PayrollRecord>> getPayrolls() {
     return _payrolls
         .orderBy('periodEnd', descending: true)
@@ -253,5 +317,42 @@ class FirestoreService {
       if (!doc.exists) return null;
       return StoreSettings.fromMap(doc.id, doc.data() as Map<String, dynamic>);
     });
+  }
+
+  // ── Cash Advances ──────────────────────────────
+
+  Future<void> addCashAdvance(CashAdvance advance) async {
+    try {
+      await _cashAdvances.add(advance.toMap());
+    } catch (e) {
+      throw Exception('Failed to submit cash advance. Please try again.');
+    }
+  }
+
+  Stream<List<CashAdvance>> getCashAdvances() {
+    return _cashAdvances
+        .orderBy('requestedAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => CashAdvance.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+            .toList());
+  }
+
+  Stream<List<CashAdvance>> getCashAdvancesByUser(String userId) {
+    return _cashAdvances
+        .where('employeeId', isEqualTo: userId)
+        .orderBy('requestedAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => CashAdvance.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+            .toList());
+  }
+
+  Future<void> updateCashAdvance(String id, Map<String, dynamic> data) async {
+    try {
+      await _cashAdvances.doc(id).update(data);
+    } catch (e) {
+      throw Exception('Failed to update cash advance. Please try again.');
+    }
   }
 }

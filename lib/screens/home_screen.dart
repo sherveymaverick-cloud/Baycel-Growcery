@@ -99,12 +99,19 @@ class _HomeScreenState extends State<HomeScreen> {
       default:
         _dashboardCache.putIfAbsent('floor_$role', () => FloorStaffDashboard(role: role));
         final dashboard = _dashboardCache['floor_$role']!;
-        return [
+        final items = [
           NavigationItem(icon: Icons.home, label: 'Home', page: dashboard),
           NavigationItem(icon: Icons.access_time, label: 'Attendance', page: const AttendanceScreen()),
           NavigationItem(icon: Icons.person, label: 'Profile', page: const ProfileScreen()),
           NavigationItem(icon: Icons.settings, label: 'Settings', page: const SettingsScreen()),
         ];
+        if (role == 'delivery_checker' || role == 'merchandiser' || role == 'bodegero') {
+          items.insert(1, NavigationItem(icon: Icons.inventory_2, label: 'Inventory', page: const InventoryScreen()));
+        }
+        if (role == 'delivery_checker' || role == 'bodegero') {
+          items.insert(2, NavigationItem(icon: Icons.local_shipping, label: 'Deliveries', page: const DeliveryScreen()));
+        }
+        return items;
     }
   }
 
@@ -176,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Baycel Growcery', style: BaycelTypography.headlineMd.copyWith(fontSize: 15, color: Colors.white)),
+                              Text('Baycel Growcery', style: BaycelTypography.titleLg.copyWith(color: Colors.white)),
                               Text('Store Management', style: BaycelTypography.labelSm.copyWith(color: Colors.white.withValues(alpha: 0.75), fontSize: 10)),
                             ],
                           ),
@@ -196,7 +203,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(_userName, style: BaycelTypography.body.copyWith(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w600)),
+                              Text(_userName, style: BaycelTypography.bodyMd.copyWith(color: Colors.white)),
                               Container(
                                 margin: const EdgeInsets.only(top: 3),
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -232,6 +239,25 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(border: Border(top: BorderSide(color: BaycelColors.divider.withValues(alpha: 0.5)))),
                 child: GestureDetector(
                   onTap: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: Text('Log out?', style: BaycelTypography.title),
+                        content: Text('You will be returned to the login screen.',
+                          style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary)),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(false),
+                            child: Text('Cancel', style: BaycelTypography.label.copyWith(color: BaycelColors.textSecondary)),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(true),
+                            child: Text('Log out', style: BaycelTypography.label.copyWith(color: BaycelColors.error, fontWeight: FontWeight.w600)),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed != true) return;
                     try {
                       await AuthService().signOut();
                       if (context.mounted) {
@@ -324,8 +350,9 @@ class _HomeScreenState extends State<HomeScreen> {
           SizedBox(width: 16),
           _TopbarIconBtn(
             icon: Icons.notifications_outlined,
-            hasBadge: true,
-            onTap: () => _showNotifications(context),
+            hasBadge: false,
+            onTap: () {},
+            tooltip: 'Notifications',
           ),
         ],
       ),
@@ -383,57 +410,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController.clear();
     _searchFocusNode.unfocus();
   }
-
-  void _showNotifications(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Notifications', style: BaycelTypography.headlineMd),
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: Text('Close', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.crimson)),
-                ),
-              ],
-            ),
-            SizedBox(height: BaycelSpacing.sm),
-            _NotificationItem(
-              icon: Icons.inventory_2_outlined,
-              title: 'Low Stock Alert',
-              subtitle: '5 products need reordering',
-              time: '2 min ago',
-              color: BaycelColors.marigoldDark,
-            ),
-            _NotificationItem(
-              icon: Icons.local_shipping_outlined,
-              title: 'Delivery Received',
-              subtitle: 'Supplier delivery verified by Juan',
-              time: '15 min ago',
-              color: BaycelColors.success,
-            ),
-            _NotificationItem(
-              icon: Icons.access_time,
-              title: 'Late Arrival',
-              subtitle: '2 employees clocked in late today',
-              time: '1 hour ago',
-              color: BaycelColors.crimson,
-            ),
-            SizedBox(height: BaycelSpacing.md),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class NavigationItem {
@@ -489,8 +465,9 @@ class _TopbarIconBtn extends StatefulWidget {
   final IconData icon;
   final bool hasBadge;
   final VoidCallback onTap;
+  final String? tooltip;
 
-  const _TopbarIconBtn({required this.icon, required this.hasBadge, required this.onTap});
+  const _TopbarIconBtn({required this.icon, required this.hasBadge, required this.onTap, this.tooltip});
 
   @override
   State<_TopbarIconBtn> createState() => _TopbarIconBtnState();
@@ -523,7 +500,7 @@ class _TopbarIconBtnState extends State<_TopbarIconBtn> with SingleTickerProvide
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
+    final btn = MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
       child: GestureDetector(
@@ -585,53 +562,6 @@ class _TopbarIconBtnState extends State<_TopbarIconBtn> with SingleTickerProvide
         ),
       ),
     );
-  }
-}
-
-class _NotificationItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final String time;
-  final Color color;
-
-  const _NotificationItem({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.time,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 34, height: 34,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(BaycelRadius.lg),
-            ),
-            child: Icon(icon, size: 16, color: color),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: BaycelTypography.body.copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
-                SizedBox(height: 2),
-                Text(subtitle, style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 12)),
-              ],
-            ),
-          ),
-          Text(time, style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled, fontSize: 11)),
-        ],
-      ),
-    );
+    return widget.tooltip != null ? Tooltip(message: widget.tooltip!, child: btn) : btn;
   }
 }

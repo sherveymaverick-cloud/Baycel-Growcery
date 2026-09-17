@@ -138,6 +138,24 @@ class _PayrollScreenState extends State<PayrollScreen> {
     }
   }
 
+  void _markAsPaid(String payrollId) async {
+    try {
+      await _firestoreService.updatePayroll(payrollId, {
+        'status': 'paid',
+        'paidAt': DateTime.now(),
+      });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Marked as paid')),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update. Please try again.'), backgroundColor: BaycelColors.error),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<PayrollRecord>>(
@@ -259,51 +277,56 @@ class _PayrollScreenState extends State<PayrollScreen> {
       children: [
               Text(_isOwnerOrManager ? 'Payroll Records' : 'My Payslip Records', style: BaycelTypography.headlineMd),
         SizedBox(height: BaycelSpacing.md),
-        Container(
-          decoration: BaycelComponents.card,
-          child: Table(
-            columnWidths: const {
-              0: FlexColumnWidth(3),
-              1: FlexColumnWidth(2),
-              2: FlexColumnWidth(2),
-              3: FlexColumnWidth(2),
-              4: FlexColumnWidth(2),
-              5: FlexColumnWidth(2),
-            },
-            children: [
-              TableRow(
-                children: [
-                  _buildTh('Employee'),
-                  _buildTh('Role'),
-                  _buildTh('Gross Pay'),
-                  _buildTh('Deductions'),
-                  _buildTh('Net Pay'),
-                  _buildTh('Status'),
-                ],
+        if (records.isEmpty)
+          Container(
+            width: double.infinity,
+            decoration: BaycelComponents.card,
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: BaycelSpacing.xl),
+              child: Center(
+                child: Text('No payroll records found', style: BaycelTypography.body.copyWith(color: BaycelColors.textMuted)),
               ),
-              if (records.isEmpty)
-                TableRow(
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.all(BaycelSpacing.xl),
-                      child: Text(
-                        'No payroll records found',
-                        style: BaycelTypography.body.copyWith(color: BaycelColors.textMuted),
-                        textAlign: TextAlign.center,
-                      ),
+            ),
+          )
+        else
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return Container(
+                decoration: BaycelComponents.card,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: constraints.maxWidth,
+                    child: Table(
+                      columnWidths: const {
+                        0: FlexColumnWidth(3),
+                        1: FlexColumnWidth(2),
+                        2: FlexColumnWidth(2),
+                        3: FlexColumnWidth(2),
+                        4: FlexColumnWidth(2),
+                        5: FlexColumnWidth(2),
+                        6: FlexColumnWidth(2),
+                      },
+                      children: [
+                        TableRow(
+                          children: [
+                            _buildTh('Employee'),
+                            _buildTh('Role'),
+                            _buildTh('Gross Pay'),
+                            _buildTh('Deductions'),
+                            _buildTh('Net Pay'),
+                            _buildTh('Status'),
+                            if (_isOwnerOrManager) _buildTh('Action'),
+                          ],
+                        ),
+                        ...records.map((record) => _buildTr(record)),
+                      ],
                     ),
-                    const SizedBox(),
-                    const SizedBox(),
-                    const SizedBox(),
-                    const SizedBox(),
-                    const SizedBox(),
-                  ],
-                )
-              else
-                ...records.map((record) => _buildTr(record)),
-            ],
+                  ),
+                ),
+              );
+            },
           ),
-        ),
       ],
     );
   }
@@ -345,8 +368,27 @@ class _PayrollScreenState extends State<PayrollScreen> {
         ),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: 10),
-          child: _StatusPill(status: record.status),
+          child: BaycelStatusPill(
+            label: record.status == 'paid' ? 'Paid' : 'Pending',
+            color: record.status == 'paid' ? BaycelColors.success : BaycelColors.marigoldDark,
+          ),
         ),
+        if (_isOwnerOrManager)
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: 10),
+            child: record.status == 'pending'
+              ? SizedBox(
+                  height: 28,
+                  child: ElevatedButton(
+                    onPressed: () => _markAsPaid(record.id),
+                    style: BaycelComponents.buttonPrimary.copyWith(
+                      padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 10, vertical: 0)),
+                    ),
+                    child: Text('Mark Paid', style: BaycelTypography.labelXs.copyWith(color: Colors.white)),
+                  ),
+                )
+              : Text('${record.paidAt?.month}/${record.paidAt?.day}', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
+          ),
       ],
     );
   }
@@ -359,34 +401,5 @@ class _PayrollScreenState extends State<PayrollScreen> {
       (Match m) => '${m.group(1)},',
     );
     return '$formatted.$fraction';
-  }
-}
-
-class _StatusPill extends StatelessWidget {
-  final String status;
-
-  const _StatusPill({required this.status});
-
-  @override
-  Widget build(BuildContext context) {
-    final isPaid = status == 'paid';
-    final color = isPaid ? BaycelColors.success : BaycelColors.marigoldDark;
-    final label = isPaid ? 'Paid' : 'Pending';
-
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: BaycelSpacing.sm,
-        vertical: BaycelSpacing.xxs,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(BaycelRadius.full),
-      ),
-      child: Text(
-        label,
-        style: BaycelTypography.labelSm.copyWith(color: color, fontSize: 11),
-        textAlign: TextAlign.center,
-      ),
-    );
   }
 }
