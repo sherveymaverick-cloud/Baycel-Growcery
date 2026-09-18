@@ -287,7 +287,8 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
               child: Text('No attendance data', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)),
             ))
           else
-            Expanded(
+            SizedBox(
+              height: 160,
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
