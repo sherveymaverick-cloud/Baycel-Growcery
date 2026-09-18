@@ -12,55 +12,66 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _rateController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
-  String? _nameError;
-  String? _emailError;
-  String? _passwordError;
   String _selectedRole = 'cashier';
   int _selectedPayday = 15;
+  String _scheduleStart = '08:00';
+  String _scheduleEnd = '17:00';
 
   static const _roles = [
-    ('owner', 'Owner'),
-    ('manager', 'Manager'),
-    ('cashier', 'Cashier'),
-    ('bagger', 'Bagger'),
-    ('bodegero', 'Bodegero'),
-    ('delivery_checker', 'Delivery Checker'),
-    ('merchandiser', 'Merchandiser'),
+    ('owner', 'Owner', Color(0xFFC62828)),
+    ('manager', 'Manager', Color(0xFFC62828)),
+    ('cashier', 'Cashier', Color(0xFF006AB8)),
+    ('bagger', 'Bagger', Color(0xFF7B1FA2)),
+    ('bodegero', 'Bodegero', Color(0xFFF57F17)),
+    ('delivery_checker', 'Delivery Checker', Color(0xFF0D47A1)),
+    ('merchandiser', 'Merchandiser', Color(0xFF2E7D32)),
   ];
 
-  void _validateAndRegister() {
-    bool valid = true;
-    setState(() {
-      _nameError = null;
-      _emailError = null;
-      _passwordError = null;
-    });
+  static const _hours = [
+    '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
+    '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
+    '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+    '18:00', '19:00', '20:00', '21:00', '22:00', '23:00',
+  ];
 
-    final name = _nameController.text.trim();
-    if (name.isEmpty) {
-      setState(() => _nameError = 'Enter your full name.');
-      valid = false;
-    }
+  int get _passwordStrength {
+    final p = _passwordController.text;
+    if (p.isEmpty) return 0;
+    int s = 0;
+    if (p.length >= 6) s++;
+    if (p.length >= 10) s++;
+    if (RegExp(r'[A-Z]').hasMatch(p)) s++;
+    if (RegExp(r'[0-9]').hasMatch(p)) s++;
+    if (RegExp(r'[^A-Za-z0-9]').hasMatch(p)) s++;
+    return s;
+  }
 
-    final email = _emailController.text.trim();
-    if (email.isEmpty || !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
-      setState(() => _emailError = 'Enter a valid email address.');
-      valid = false;
-    }
+  Color get _passwordStrengthColor {
+    final s = _passwordStrength;
+    if (s <= 1) return BaycelColors.error;
+    if (s <= 2) return BaycelColors.marigold;
+    if (s <= 3) return BaycelColors.marigoldDark;
+    return BaycelColors.success;
+  }
 
-    final password = _passwordController.text;
-    if (password.length < 6) {
-      setState(() => _passwordError = 'Password must be at least 6 characters.');
-      valid = false;
-    }
+  String get _passwordStrengthLabel {
+    final s = _passwordStrength;
+    if (s <= 1) return 'Weak';
+    if (s <= 2) return 'Fair';
+    if (s <= 3) return 'Good';
+    return 'Strong';
+  }
 
-    if (valid) _register();
+  void _submit() {
+    if (!_formKey.currentState!.validate()) return;
+    _register();
   }
 
   Future<void> _register() async {
@@ -70,7 +81,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final password = _passwordController.text;
     final name = _nameController.text.trim();
 
-    // Save current user info before creating new account (owner/manager adding employee)
     final previousUser = FirebaseAuth.instance.currentUser;
     final previousEmail = previousUser?.email;
 
@@ -87,59 +97,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
 
-    await FirebaseFirestore.instance.collection('users').doc(result.user!.uid).set({
-      'name': name,
-      'email': email,
-      'role': _selectedRole,
-      'position': '',
-      'rate': double.tryParse(_rateController.text.trim()) ?? 0,
-      'payday': _selectedPayday,
-      'schedule': {'start': '08:00', 'end': '17:00'},
-      'rfidCardUID': '',
-      'assignedProducts': [],
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+      await FirebaseFirestore.instance.collection('users').doc(result.user!.uid).set({
+        'name': name,
+        'email': email,
+        'role': _selectedRole,
+        'rate': double.tryParse(_rateController.text.trim()) ?? 0,
+        'payday': _selectedPayday,
+        'schedule': {'start': _scheduleStart, 'end': _scheduleEnd},
+        'rfidCardUID': '',
+        'assignedProducts': [],
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
-    // If an owner/manager was logged in, re-authenticate them
-    if (previousUser != null && previousEmail != null && mounted) {
-      final passwordController = TextEditingController();
-      final reAuth = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Re-enter your password'),
-          content: TextField(
-            controller: passwordController,
-            obscureText: true,
-            decoration: const InputDecoration(hintText: 'Your password'),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Confirm'),
+      if (previousUser != null && previousEmail != null && mounted) {
+        final passwordController = TextEditingController();
+        final reAuth = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Re-enter your password'),
+            content: TextField(
+              controller: passwordController,
+              obscureText: true,
+              decoration: const InputDecoration(hintText: 'Your password'),
             ),
-          ],
-        ),
-      );
-
-      if (reAuth == true && passwordController.text.isNotEmpty) {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: previousEmail,
-          password: passwordController.text,
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Confirm'),
+              ),
+            ],
+          ),
         );
+
+        if (reAuth == true && passwordController.text.isNotEmpty) {
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
+            email: previousEmail,
+            password: passwordController.text,
+          );
+        }
+        passwordController.dispose();
       }
-      passwordController.dispose();
-    }
 
-    setState(() => _isLoading = false);
+      setState(() => _isLoading = false);
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Account created. You can now log in.')),
-      );
-      Navigator.of(context).pop();
-    }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Employee added successfully.')),
+        );
+        Navigator.of(context).pop();
+      }
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
@@ -172,208 +180,423 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-            padding: EdgeInsets.all(BaycelSpacing.xl),
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 400),
-              decoration: BaycelComponents.card,
-              child: Padding(
-                padding: EdgeInsets.all(BaycelSpacing.xl),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text('Create Account', style: BaycelTypography.headlineMd.copyWith(fontSize: 20, letterSpacing: -0.01)),
-                    SizedBox(height: BaycelSpacing.xs),
-                    Text('Register a new staff account for Baycel Growcery.',
-                      style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 13)),
-                    SizedBox(height: BaycelSpacing.xl * 1.5),
-                    _buildNameField(),
-                    SizedBox(height: BaycelSpacing.base),
-                    _buildEmailField(),
-                    SizedBox(height: BaycelSpacing.base),
-                    _buildPasswordField(),
-                    SizedBox(height: BaycelSpacing.base),
-                    _buildRoleSelector(),
-                    SizedBox(height: BaycelSpacing.base),
-                    _buildRateField(),
-                    SizedBox(height: BaycelSpacing.base),
-                    _buildPaydaySelector(),
-                    SizedBox(height: BaycelSpacing.lg),
-                    _buildRegisterButton(),
-                    SizedBox(height: BaycelSpacing.lg),
-                    Center(child: GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Text.rich(TextSpan(children: [
-                        TextSpan(text: 'Already have an account? ', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 12)),
-                        TextSpan(text: 'Log in', style: BaycelTypography.label.copyWith(color: BaycelColors.crimson, fontSize: 12, fontWeight: FontWeight.w600)),
-                      ])),
-                    )),
-                  ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth > 600;
+            final formMaxWidth = isWide ? 560.0 : constraints.maxWidth;
+            return Center(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isWide ? BaycelSpacing.xl : BaycelSpacing.base,
+                  vertical: BaycelSpacing.lg,
+                ),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: formMaxWidth),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildPageHeader(),
+                        SizedBox(height: BaycelSpacing.xl),
+                        _buildAccountSection(),
+                        SizedBox(height: BaycelSpacing.lg),
+                        _buildRoleSection(),
+                        SizedBox(height: BaycelSpacing.lg),
+                        _buildEmploymentSection(),
+                        SizedBox(height: BaycelSpacing.lg),
+                        _buildScheduleSection(),
+                        SizedBox(height: BaycelSpacing.xl),
+                        _buildRegisterButton(),
+                        SizedBox(height: BaycelSpacing.lg),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         ),
+      ),
+    );
+  }
+
+  Widget _buildPageHeader() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Add Employee', style: BaycelTypography.headline),
+        SizedBox(height: BaycelSpacing.xs),
+        Text(
+          'Create a new staff account.',
+          style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAccountSection() {
+    return _SectionCard(
+      title: 'Account',
+      children: [
+        _label('Full Name'),
+        SizedBox(height: BaycelSpacing.xs),
+        _buildNameField(),
+        SizedBox(height: BaycelSpacing.base),
+        _label('Email'),
+        SizedBox(height: BaycelSpacing.xs),
+        _buildEmailField(),
+        SizedBox(height: BaycelSpacing.base),
+        _label('Password'),
+        SizedBox(height: BaycelSpacing.xs),
+        _buildPasswordField(),
+        _buildPasswordStrengthBar(),
+      ],
+    );
+  }
+
+  Widget _buildRoleSection() {
+    return _SectionCard(
+      title: 'Role',
+      children: [
+        _buildRoleChips(),
+      ],
+    );
+  }
+
+  Widget _buildEmploymentSection() {
+    return _SectionCard(
+      title: 'Employment',
+      children: [
+        _label('Hourly Rate (₱)'),
+        SizedBox(height: BaycelSpacing.xs),
+        _buildRateField(),
+        SizedBox(height: BaycelSpacing.base),
+        _label('Payday'),
+        SizedBox(height: BaycelSpacing.xs),
+        _buildPaydaySelector(),
+      ],
+    );
+  }
+
+  Widget _buildScheduleSection() {
+    return _SectionCard(
+      title: 'Schedule',
+      children: [
+        _buildScheduleRow(),
+      ],
+    );
+  }
+
+  Widget _label(String text) => Text(
+    text,
+    style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textSecondary, fontSize: 11),
+  );
+
+  InputDecoration _fieldDeco({String? hintText, Widget? suffixIcon, Widget? prefixIcon}) {
+    return InputDecoration(
+      filled: true,
+      fillColor: BaycelColors.card,
+      hintText: hintText,
+      hintStyle: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled, fontSize: 13),
+      contentPadding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: BaycelSpacing.md),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.divider)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.divider)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.crimson, width: 2)),
+      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.error)),
+      focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.error, width: 2)),
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
     );
   }
 
   Widget _buildNameField() {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Full Name', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textSecondary, fontSize: 12, letterSpacing: 0.02)),
-      SizedBox(height: BaycelSpacing.xs),
-      TextFormField(
-        controller: _nameController,
-        textCapitalization: TextCapitalization.words,
-        style: BaycelTypography.body.copyWith(fontSize: 13),
-        decoration: InputDecoration(
-          filled: true, fillColor: BaycelColors.card, hintText: 'Juan Dela Cruz',
-          hintStyle: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled, fontSize: 13),
-          contentPadding: EdgeInsets.symmetric(horizontal: BaycelSpacing.lg, vertical: BaycelSpacing.lg),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.divider)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.divider)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.crimson, width: 2)),
-          errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.error)),
+    return TextFormField(
+      controller: _nameController,
+      textCapitalization: TextCapitalization.words,
+      style: BaycelTypography.body.copyWith(fontSize: 13),
+      decoration: _fieldDeco(
+        hintText: 'Juan Dela Cruz',
+        prefixIcon: Padding(
+          padding: EdgeInsets.only(left: BaycelSpacing.md, right: BaycelSpacing.xs),
+          child: Icon(Icons.person_outline, size: 18, color: BaycelColors.textDisabled),
         ),
-        onChanged: (_) => setState(() => _nameError = null),
       ),
-      if (_nameError != null) ...[SizedBox(height: BaycelSpacing.xs), Text(_nameError!, style: BaycelTypography.bodySm.copyWith(color: BaycelColors.error, fontSize: 11))],
-    ]);
+      validator: (v) {
+        if (v == null || v.trim().isEmpty) return 'Enter the employee\'s full name.';
+        return null;
+      },
+    );
   }
 
   Widget _buildEmailField() {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Email address', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textSecondary, fontSize: 12, letterSpacing: 0.02)),
-      SizedBox(height: BaycelSpacing.xs),
-      TextFormField(
-        controller: _emailController,
-        keyboardType: TextInputType.emailAddress,
-        textCapitalization: TextCapitalization.none,
-        style: BaycelTypography.body.copyWith(fontSize: 13),
-        decoration: InputDecoration(
-          filled: true, fillColor: BaycelColors.card, hintText: 'name@baycel.com',
-          hintStyle: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled, fontSize: 13),
-          contentPadding: EdgeInsets.symmetric(horizontal: BaycelSpacing.lg, vertical: BaycelSpacing.lg),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.divider)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.divider)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.crimson, width: 2)),
-          errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.error)),
+    return TextFormField(
+      controller: _emailController,
+      keyboardType: TextInputType.emailAddress,
+      textCapitalization: TextCapitalization.none,
+      style: BaycelTypography.body.copyWith(fontSize: 13),
+      decoration: _fieldDeco(
+        hintText: 'name@baycel.com',
+        prefixIcon: Padding(
+          padding: EdgeInsets.only(left: BaycelSpacing.md, right: BaycelSpacing.xs),
+          child: Icon(Icons.email_outlined, size: 18, color: BaycelColors.textDisabled),
         ),
-        onChanged: (_) => setState(() => _emailError = null),
       ),
-      if (_emailError != null) ...[SizedBox(height: BaycelSpacing.xs), Text(_emailError!, style: BaycelTypography.bodySm.copyWith(color: BaycelColors.error, fontSize: 11))],
-    ]);
+      validator: (v) {
+        if (v == null || v.trim().isEmpty) return 'Enter an email address.';
+        if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(v.trim())) return 'Enter a valid email address.';
+        return null;
+      },
+    );
   }
 
   Widget _buildPasswordField() {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Password', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textSecondary, fontSize: 12, letterSpacing: 0.02)),
-      SizedBox(height: BaycelSpacing.xs),
-      Stack(children: [
-        TextFormField(
-          controller: _passwordController,
-          obscureText: _obscurePassword,
-          style: BaycelTypography.body.copyWith(fontSize: 13),
-          decoration: InputDecoration(
-            filled: true, fillColor: BaycelColors.card, hintText: 'At least 6 characters',
-            hintStyle: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled, fontSize: 13),
-            contentPadding: EdgeInsets.symmetric(horizontal: BaycelSpacing.lg, vertical: BaycelSpacing.lg),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.divider)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.divider)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.crimson, width: 2)),
-            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.error)),
-          ),
-          onChanged: (_) => setState(() => _passwordError = null),
+    return TextFormField(
+      controller: _passwordController,
+      obscureText: _obscurePassword,
+      style: BaycelTypography.body.copyWith(fontSize: 13),
+      onChanged: (_) => setState(() {}),
+      decoration: _fieldDeco(
+        hintText: 'At least 6 characters',
+        prefixIcon: Padding(
+          padding: EdgeInsets.only(left: BaycelSpacing.md, right: BaycelSpacing.xs),
+          child: Icon(Icons.lock_outline, size: 18, color: BaycelColors.textDisabled),
         ),
-        Positioned(right: BaycelSpacing.md, top: BaycelSpacing.lg, child: IconButton(
+        suffixIcon: IconButton(
           onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
           icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: BaycelColors.textMuted, size: 20),
-        )),
-      ]),
-      if (_passwordError != null) ...[SizedBox(height: BaycelSpacing.xs), Text(_passwordError!, style: BaycelTypography.bodySm.copyWith(color: BaycelColors.error, fontSize: 11))],
-    ]);
-  }
-
-  Widget _buildRoleSelector() {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Role', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textSecondary, fontSize: 12, letterSpacing: 0.02)),
-      SizedBox(height: BaycelSpacing.xs),
-      Container(
-        padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.lg),
-        decoration: BoxDecoration(
-          color: BaycelColors.card,
-          border: Border.all(color: BaycelColors.divider),
-          borderRadius: BorderRadius.circular(BaycelRadius.md),
-        ),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<String>(
-            value: _selectedRole,
-            isExpanded: true,
-            style: BaycelTypography.body.copyWith(fontSize: 13),
-            dropdownColor: BaycelColors.card,
-            items: _roles.map((r) => DropdownMenuItem(value: r.$1, child: Text(r.$2))).toList(),
-            onChanged: (v) => setState(() => _selectedRole = v ?? 'cashier'),
-          ),
         ),
       ),
-    ]);
+      validator: (v) {
+        if (v == null || v.length < 6) return 'Password must be at least 6 characters.';
+        return null;
+      },
+    );
+  }
+
+  Widget _buildPasswordStrengthBar() {
+    final strength = _passwordStrength;
+    if (strength == 0 && _passwordController.text.isEmpty) return SizedBox.shrink();
+    return Padding(
+      padding: EdgeInsets.only(top: BaycelSpacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: LinearProgressIndicator(
+              value: strength / 5,
+              backgroundColor: BaycelColors.divider,
+              valueColor: AlwaysStoppedAnimation(_passwordStrengthColor),
+              minHeight: 3,
+            ),
+          ),
+          SizedBox(height: BaycelSpacing.xs),
+          Text(_passwordStrengthLabel, style: BaycelTypography.labelXs.copyWith(
+            color: _passwordStrengthColor, fontWeight: FontWeight.w600, fontSize: 10)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoleChips() {
+    return Wrap(
+      spacing: BaycelSpacing.xs,
+      runSpacing: BaycelSpacing.xs,
+      children: _roles.map((r) {
+        final isSelected = _selectedRole == r.$1;
+        return GestureDetector(
+          onTap: () => setState(() => _selectedRole = r.$1),
+          child: AnimatedContainer(
+            duration: Duration(milliseconds: 150),
+            padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: BaycelSpacing.xs),
+            decoration: BoxDecoration(
+              color: isSelected ? r.$3.withValues(alpha: 0.12) : BaycelColors.card,
+              border: Border.all(
+                color: isSelected ? r.$3 : BaycelColors.divider,
+                width: isSelected ? 1.5 : 1,
+              ),
+              borderRadius: BorderRadius.circular(BaycelRadius.full),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(color: r.$3, shape: BoxShape.circle),
+                ),
+                SizedBox(width: 6),
+                Text(r.$2, style: BaycelTypography.labelXs.copyWith(
+                  color: isSelected ? r.$3 : BaycelColors.textSecondary,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  fontSize: 11,
+                )),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
   }
 
   Widget _buildRateField() {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Hourly Rate (\u20B1)', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textSecondary, fontSize: 12, letterSpacing: 0.02)),
-      SizedBox(height: BaycelSpacing.xs),
-      TextFormField(
-        controller: _rateController,
-        keyboardType: TextInputType.number,
-        style: BaycelTypography.body.copyWith(fontSize: 13),
-        decoration: InputDecoration(
-          filled: true, fillColor: BaycelColors.card, hintText: '0.00',
-          hintStyle: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled, fontSize: 13),
-          contentPadding: EdgeInsets.symmetric(horizontal: BaycelSpacing.lg, vertical: BaycelSpacing.lg),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.divider)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.divider)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.crimson, width: 2)),
-          errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.md), borderSide: BorderSide(color: BaycelColors.error)),
+    return TextFormField(
+      controller: _rateController,
+      keyboardType: TextInputType.number,
+      style: BaycelTypography.body.copyWith(fontSize: 13),
+      decoration: _fieldDeco(
+        hintText: '0.00',
+        prefixIcon: Padding(
+          padding: EdgeInsets.only(left: BaycelSpacing.md, right: BaycelSpacing.xs),
+          child: Icon(Icons.payments_outlined, size: 18, color: BaycelColors.textDisabled),
         ),
       ),
-    ]);
+    );
   }
 
   Widget _buildPaydaySelector() {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Payday', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textSecondary, fontSize: 12, letterSpacing: 0.02)),
-      SizedBox(height: BaycelSpacing.xs),
-      Container(
-        padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.lg),
-        decoration: BoxDecoration(
-          color: BaycelColors.card,
-          border: Border.all(color: BaycelColors.divider),
-          borderRadius: BorderRadius.circular(BaycelRadius.md),
-        ),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<int>(
-            value: _selectedPayday,
-            isExpanded: true,
-            style: BaycelTypography.body.copyWith(fontSize: 13),
-            dropdownColor: BaycelColors.card,
-            items: const [
-              DropdownMenuItem(value: 15, child: Text('Every 15th')),
-              DropdownMenuItem(value: 30, child: Text('Every 30th (End of month)')),
-            ],
-            onChanged: (v) => setState(() => _selectedPayday = v ?? 15),
-          ),
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base),
+      decoration: BoxDecoration(
+        color: BaycelColors.card,
+        border: Border.all(color: BaycelColors.divider),
+        borderRadius: BorderRadius.circular(BaycelRadius.md),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          value: _selectedPayday,
+          isExpanded: true,
+          style: BaycelTypography.body.copyWith(fontSize: 13),
+          dropdownColor: BaycelColors.card,
+          items: const [
+            DropdownMenuItem(value: 15, child: Text('Every 15th')),
+            DropdownMenuItem(value: 30, child: Text('Every 30th (End of month)')),
+          ],
+          onChanged: (v) => setState(() => _selectedPayday = v ?? 15),
         ),
       ),
-    ]);
+    );
+  }
+
+  Widget _buildScheduleRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _label('Start'),
+              SizedBox(height: BaycelSpacing.xs),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base),
+                decoration: BoxDecoration(
+                  color: BaycelColors.card,
+                  border: Border.all(color: BaycelColors.divider),
+                  borderRadius: BorderRadius.circular(BaycelRadius.md),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _scheduleStart,
+                    isExpanded: true,
+                    style: BaycelTypography.body.copyWith(fontSize: 13),
+                    dropdownColor: BaycelColors.card,
+                    items: _hours.map((h) => DropdownMenuItem(value: h, child: Text(h))).toList(),
+                    onChanged: (v) => setState(() => _scheduleStart = v ?? _scheduleStart),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.only(top: BaycelSpacing.lg, left: BaycelSpacing.sm, right: BaycelSpacing.sm),
+          child: Icon(Icons.arrow_forward, size: 16, color: BaycelColors.textDisabled),
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _label('End'),
+              SizedBox(height: BaycelSpacing.xs),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base),
+                decoration: BoxDecoration(
+                  color: BaycelColors.card,
+                  border: Border.all(color: BaycelColors.divider),
+                  borderRadius: BorderRadius.circular(BaycelRadius.md),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _scheduleEnd,
+                    isExpanded: true,
+                    style: BaycelTypography.body.copyWith(fontSize: 13),
+                    dropdownColor: BaycelColors.card,
+                    items: _hours.map((h) => DropdownMenuItem(value: h, child: Text(h))).toList(),
+                    onChanged: (v) => setState(() => _scheduleEnd = v ?? _scheduleEnd),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildRegisterButton() {
-    return SizedBox(width: double.infinity, height: 52, child: ElevatedButton(
-      onPressed: _isLoading ? null : _validateAndRegister,
-      style: BaycelComponents.buttonPrimary,
-      child: _isLoading
-        ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-        : Text('Create Account', style: BaycelTypography.label.copyWith(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-    ));
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : _submit,
+        style: BaycelComponents.buttonPrimary,
+        child: _isLoading
+            ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.person_add_outlined, size: 18, color: Colors.white),
+                  SizedBox(width: BaycelSpacing.sm),
+                  Text('Add Employee', style: BaycelTypography.label.copyWith(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
+
+  const _SectionCard({
+    required this.title,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(BaycelSpacing.base),
+      decoration: BaycelComponents.card,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: BaycelTypography.labelSm.copyWith(
+              color: BaycelColors.textMuted,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.05,
+            ),
+          ),
+          SizedBox(height: BaycelSpacing.md),
+          ...children,
+        ],
+      ),
+    );
   }
 }

@@ -41,6 +41,19 @@ class AuthService {
     }
   }
 
+  Future<void> deleteUser(String uid) async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null && user.uid == uid) {
+        await user.delete();
+      }
+    } on FirebaseAuthException catch (e) {
+      throw Exception(_friendlyMessage(e.code));
+    } catch (e) {
+      throw Exception('Failed to delete user. Please try again.');
+    }
+  }
+
   String _friendlyMessage(String code) {
     switch (code) {
       case 'user-not-found':

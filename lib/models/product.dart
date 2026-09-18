@@ -4,6 +4,7 @@ class Product {
   final String id;
   final String name;
   final String sku;
+  final String barcode;
   final String category;
   final double price;
   final int stockQuantity;
@@ -17,6 +18,7 @@ class Product {
     required this.id,
     required this.name,
     required this.sku,
+    this.barcode = '',
     required this.category,
     required this.price,
     required this.stockQuantity,
@@ -31,6 +33,7 @@ class Product {
     return {
       'name': name,
       'sku': sku,
+      'barcode': barcode,
       'category': category,
       'price': price,
       'stockQuantity': stockQuantity,
@@ -47,6 +50,7 @@ class Product {
       id: id,
       name: map['name'] ?? '',
       sku: map['sku'] ?? '',
+      barcode: map['barcode'] ?? '',
       category: map['category'] ?? 'Uncategorized',
       price: (map['price'] ?? 0).toDouble(),
       stockQuantity: map['stockQuantity'] ?? map['quantity'] ?? 0,

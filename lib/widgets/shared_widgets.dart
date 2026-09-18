@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
+import '../models/delivery.dart';
 
 class BaycelStatCard extends StatelessWidget {
   final String value;
@@ -38,7 +39,7 @@ class BaycelStatCard extends StatelessWidget {
           SizedBox(height: BaycelSpacing.xxs),
           Text(title, style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary, fontSize: 12)),
           SizedBox(height: BaycelSpacing.xxs),
-          Text(subtitle, style: BaycelTypography.labelSm.copyWith(color: subtitleColor, fontSize: 10.5)),
+          Text(subtitle, style: BaycelTypography.labelXs.copyWith(color: subtitleColor)),
         ],
       ),
     );
@@ -109,7 +110,7 @@ class BaycelPill extends StatelessWidget {
         children: [
           Container(width: 5, height: 5, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
           SizedBox(width: BaycelSpacing.xxs + 2),
-          Text(label, style: BaycelTypography.labelSm.copyWith(color: color, fontSize: 10.5)),
+          Text(label, style: BaycelTypography.labelXs.copyWith(color: color)),
         ],
       ),
     );
@@ -132,6 +133,39 @@ class BaycelStatusPill extends StatelessWidget {
       ),
       child: Text(label, style: BaycelTypography.labelSm.copyWith(color: color, fontSize: 11), textAlign: TextAlign.center),
     );
+  }
+}
+
+class DeliveryStatusPill extends StatelessWidget {
+  final DeliveryStatus status;
+  final String? overrideLabel;
+
+  const DeliveryStatusPill({super.key, required this.status, this.overrideLabel});
+
+  @override
+  Widget build(BuildContext context) {
+    Color color;
+    String label;
+
+    switch (status) {
+      case DeliveryStatus.delivered:
+        color = BaycelColors.success;
+        label = 'Verified';
+      case DeliveryStatus.pending:
+        color = BaycelColors.marigoldDark;
+        label = 'Pending';
+      case DeliveryStatus.inTransit:
+        color = BaycelColors.blue;
+        label = 'In Transit';
+      case DeliveryStatus.discrepancy:
+        color = BaycelColors.error;
+        label = 'Discrepancy';
+      case DeliveryStatus.cancelled:
+        color = BaycelColors.textMuted;
+        label = 'Cancelled';
+    }
+
+    return BaycelStatusPill(label: overrideLabel ?? label, color: color);
   }
 }
 

@@ -101,37 +101,50 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   }
 
   Widget _buildFilterChips() {
-    final filters = [
-      (label: 'All', status: null),
-      (label: 'Verified', status: DeliveryStatus.delivered),
-      (label: 'Pending', status: DeliveryStatus.pending),
-      (label: 'Discrepancy', status: DeliveryStatus.discrepancy),
-    ];
+    return StreamBuilder<List<Delivery>>(
+      stream: _firestore.getDeliveries(),
+      builder: (context, snapshot) {
+        final all = snapshot.data ?? [];
+        final counts = {
+          null: all.length,
+          DeliveryStatus.delivered: all.where((d) => d.status == DeliveryStatus.delivered).length,
+          DeliveryStatus.pending: all.where((d) => d.status == DeliveryStatus.pending || d.status == DeliveryStatus.inTransit).length,
+          DeliveryStatus.discrepancy: all.where((d) => d.status == DeliveryStatus.discrepancy).length,
+        };
+        final filters = [
+          (label: 'All', status: null),
+          (label: 'Verified', status: DeliveryStatus.delivered),
+          (label: 'Pending', status: DeliveryStatus.pending),
+          (label: 'Discrepancy', status: DeliveryStatus.discrepancy),
+        ];
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: filters.map((filter) {
-          final isSelected = _selectedFilter == filter.status;
-          return Padding(
-            padding: EdgeInsets.only(right: BaycelSpacing.sm),
-            child: ChoiceChip(
-              label: Text(filter.label, style: BaycelTypography.labelSm.copyWith(
-                color: isSelected ? Colors.white : BaycelColors.textPrimary,
-              )),
-              selected: isSelected,
-              selectedColor: BaycelColors.crimson,
-              backgroundColor: BaycelColors.card,
-              side: BorderSide(
-                color: isSelected ? BaycelColors.crimson : BaycelColors.divider,
-              ),
-              onSelected: (_) {
-                setState(() => _selectedFilter = filter.status);
-              },
-            ),
-          );
-        }).toList(),
-      ),
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: filters.map((filter) {
+              final isSelected = _selectedFilter == filter.status;
+              final count = counts[filter.status] ?? 0;
+              return Padding(
+                padding: EdgeInsets.only(right: BaycelSpacing.sm),
+                child: ChoiceChip(
+                  label: Text('${filter.label} ($count)', style: BaycelTypography.labelSm.copyWith(
+                    color: isSelected ? Colors.white : BaycelColors.textPrimary,
+                  )),
+                  selected: isSelected,
+                  selectedColor: BaycelColors.crimson,
+                  backgroundColor: BaycelColors.card,
+                  side: BorderSide(
+                    color: isSelected ? BaycelColors.crimson : BaycelColors.divider,
+                  ),
+                  onSelected: (_) {
+                    setState(() => _selectedFilter = filter.status);
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      },
     );
   }
 
@@ -154,35 +167,67 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
         if (filtered.isEmpty) {
           return Center(
-            child: Text('No deliveries found', style: BaycelTypography.body.copyWith(color: BaycelColors.textMuted)),
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: BaycelSpacing.xxl),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.local_shipping_outlined, size: 40, color: BaycelColors.textDisabled),
+                  SizedBox(height: BaycelSpacing.sm),
+                  Text('No deliveries found', style: BaycelTypography.body.copyWith(color: BaycelColors.textMuted)),
+                ],
+              ),
+            ),
           );
         }
 
         return Container(
           decoration: BaycelComponents.card,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Table(
-              columnWidths: {
-                0: FlexColumnWidth(3),
-                1: FlexColumnWidth(2),
-                2: FlexColumnWidth(1),
-                3: FlexColumnWidth(2),
-                4: FlexColumnWidth(2),
-              },
-              children: [
-                TableRow(
-                  children: [
-                    _buildTh('Supplier'),
-                    _buildTh('Date'),
-                    _buildTh('Items'),
-                    _buildTh('Received By'),
-                    _buildTh('Status'),
-                  ],
+          child: Column(
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(
+                      width: constraints.maxWidth,
+                      child: Table(
+                        columnWidths: const {
+                          0: FlexColumnWidth(3),
+                          1: FlexColumnWidth(2),
+                          2: FlexColumnWidth(1.5),
+                          3: FlexColumnWidth(2.5),
+                          4: FlexColumnWidth(2.5),
+                        },
+                        children: [
+                          TableRow(
+                            decoration: BoxDecoration(
+                              color: BaycelColors.surface,
+                              border: Border(bottom: BorderSide(color: BaycelColors.divider, width: 1)),
+                            ),
+                            children: [
+                              _buildTh('SUPPLIER'),
+                              _buildTh('DATE'),
+                              _buildTh('ITEMS'),
+                              _buildTh('RECEIVED BY'),
+                              _buildTh('STATUS'),
+                            ],
+                          ),
+                          ...filtered.map((d) => _buildTr(d)),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              if (filtered.length < 5)
+                Container(
+                  padding: EdgeInsets.symmetric(vertical: BaycelSpacing.xl),
+                  alignment: Alignment.center,
+                  child: Text('${filtered.length} of ${deliveries.length} deliveries',
+                    style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textDisabled, fontSize: 11)),
                 ),
-                ...filtered.map((d) => _buildTr(d)),
-              ],
-            ),
+            ],
           ),
         );
       },
@@ -192,7 +237,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   Padding _buildTh(String text) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: 10),
-      child: Text(text, style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textSecondary)),
+      child: Text(text, style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w500, letterSpacing: 0.03)),
     );
   }
 
@@ -223,53 +268,18 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         ),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: 10),
-          child: _buildStatusPill(delivery),
+          child: Builder(builder: (context) {
+            final short = delivery.status == DeliveryStatus.discrepancy
+                ? delivery.items.where((i) => i.receivedQuantity < i.expectedQuantity)
+                    .fold<int>(0, (acc, i) => acc + (i.expectedQuantity - i.receivedQuantity))
+                : 0;
+            return DeliveryStatusPill(
+              status: delivery.status,
+              overrideLabel: short > 0 ? '$short short' : null,
+            );
+          }),
         ),
       ],
-    );
-  }
-
-  Widget _buildStatusPill(Delivery delivery) {
-    String label;
-    Color color;
-
-    switch (delivery.status) {
-      case DeliveryStatus.delivered:
-        label = 'Verified';
-        color = BaycelColors.success;
-        break;
-      case DeliveryStatus.pending:
-        label = 'Pending';
-        color = BaycelColors.marigold;
-        break;
-      case DeliveryStatus.discrepancy:
-        final short = delivery.items
-            .where((i) => i.receivedQuantity < i.expectedQuantity)
-            .fold<int>(0, (acc, i) => acc + (i.expectedQuantity - i.receivedQuantity));
-        label = short > 0 ? '$short short' : 'Discrepancy';
-        color = BaycelColors.error;
-        break;
-      case DeliveryStatus.inTransit:
-        label = 'In Transit';
-        color = BaycelColors.blue;
-        break;
-      case DeliveryStatus.cancelled:
-        label = 'Cancelled';
-        color = BaycelColors.textMuted;
-        break;
-    }
-
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.sm, vertical: BaycelSpacing.xs),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(BaycelRadius.full),
-      ),
-      child: Text(
-        label,
-        style: BaycelTypography.labelSm.copyWith(color: color, fontSize: 11),
-        textAlign: TextAlign.center,
-      ),
     );
   }
 

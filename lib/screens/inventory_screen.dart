@@ -103,48 +103,100 @@ class _InventoryScreenState extends State<InventoryScreen> {
   void _showAddProductDialog() {
     final nameController = TextEditingController();
     final skuController = TextEditingController();
+    final barcodeController = TextEditingController();
     final priceController = TextEditingController();
     final stockController = TextEditingController();
     final reorderController = TextEditingController();
     String category = 'Groceries & Canned';
     String unit = 'pcs';
 
+    InputDecoration _fieldDeco(String hint) => BaycelComponents.input.copyWith(
+      hintText: hint,
+      filled: true,
+      fillColor: BaycelColors.card,
+      contentPadding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: 12),
+    );
+
+    Widget _label(String text, {bool required = false}) {
+      return Padding(
+        padding: EdgeInsets.only(bottom: BaycelSpacing.xs),
+        child: Row(
+          children: [
+            Text(text, style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textSecondary, fontSize: 12)),
+            if (required) ...[
+              SizedBox(width: 3),
+              Text('*', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.error, fontSize: 12)),
+            ],
+          ],
+        ),
+      );
+    }
+
+    Widget _sectionTitle(String text) {
+      return Padding(
+        padding: EdgeInsets.only(top: BaycelSpacing.md, bottom: BaycelSpacing.sm),
+        child: Text(text, style: BaycelTypography.labelSm.copyWith(
+          color: BaycelColors.textMuted, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.05)),
+      );
+    }
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Add Product', style: BaycelTypography.title),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: nameController, decoration: BaycelComponents.input.copyWith(hintText: 'Product name')),
-              SizedBox(height: BaycelSpacing.md),
-              TextField(controller: skuController, decoration: BaycelComponents.input.copyWith(hintText: 'SKU')),
-              SizedBox(height: BaycelSpacing.md),
-              TextField(controller: priceController, keyboardType: TextInputType.number, decoration: BaycelComponents.input.copyWith(hintText: 'Price')),
-              SizedBox(height: BaycelSpacing.md),
-              TextField(controller: stockController, keyboardType: TextInputType.number, decoration: BaycelComponents.input.copyWith(hintText: 'Stock quantity')),
-              SizedBox(height: BaycelSpacing.md),
-              TextField(controller: reorderController, keyboardType: TextInputType.number, decoration: BaycelComponents.input.copyWith(hintText: 'Reorder level')),
-              SizedBox(height: BaycelSpacing.md),
-              DropdownButtonFormField<String>(
-                initialValue: category,
-                decoration: BaycelComponents.input,
-                items: _categories.where((c) => c != 'All').map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                onChanged: (v) => category = v ?? category,
-              ),
-              SizedBox(height: BaycelSpacing.md),
-              DropdownButtonFormField<String>(
-                initialValue: unit,
-                decoration: BaycelComponents.input,
-                items: ['pcs', 'kg', 'L', 'pack', 'box'].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
-                onChanged: (v) => unit = v ?? unit,
-              ),
-            ],
+        content: SizedBox(
+          width: 360,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _sectionTitle('Basic Info'),
+                _label('Product Name', required: true),
+                TextField(controller: nameController, decoration: _fieldDeco('e.g. Campbell Soup')),
+                SizedBox(height: BaycelSpacing.md),
+                _label('SKU'),
+                TextField(controller: skuController, decoration: _fieldDeco('e.g. CS-001')),
+                SizedBox(height: BaycelSpacing.md),
+                _label('Barcode'),
+                TextField(controller: barcodeController, decoration: _fieldDeco('e.g. 4800000000012')),
+                SizedBox(height: BaycelSpacing.md),
+                _label('Category'),
+                DropdownButtonFormField<String>(
+                  value: category,
+                  decoration: _fieldDeco(''),
+                  style: BaycelTypography.body.copyWith(fontSize: 13),
+                  items: _categories.where((c) => c != 'All').map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                  onChanged: (v) => category = v ?? category,
+                ),
+                _sectionTitle('Stock Settings'),
+                _label('Price'),
+                TextField(controller: priceController, keyboardType: TextInputType.number, decoration: _fieldDeco('0.00')),
+                SizedBox(height: BaycelSpacing.md),
+                _label('Stock Quantity'),
+                TextField(controller: stockController, keyboardType: TextInputType.number, decoration: _fieldDeco('0')),
+                SizedBox(height: BaycelSpacing.md),
+                _label('Reorder Level'),
+                TextField(controller: reorderController, keyboardType: TextInputType.number, decoration: _fieldDeco('0')),
+                SizedBox(height: BaycelSpacing.md),
+                _label('Unit'),
+                DropdownButtonFormField<String>(
+                  value: unit,
+                  decoration: _fieldDeco(''),
+                  style: BaycelTypography.body.copyWith(fontSize: 13),
+                  items: ['pcs', 'kg', 'L', 'pack', 'box'].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                  onChanged: (v) => unit = v ?? unit,
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted)),
+          ),
+          SizedBox(width: BaycelSpacing.sm),
           ElevatedButton(
             onPressed: () async {
               if (nameController.text.trim().isEmpty) {
@@ -156,6 +208,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   id: '',
                   name: nameController.text.trim(),
                   sku: skuController.text.trim(),
+                  barcode: barcodeController.text.trim(),
                   category: category,
                   price: double.tryParse(priceController.text) ?? 0,
                   stockQuantity: int.tryParse(stockController.text) ?? 0,
@@ -291,29 +344,39 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   ),
                 ),
                 Divider(height: 1, color: BaycelColors.divider),
-                Table(
-                  columnWidths: const {
-                    0: FlexColumnWidth(3),
-                    1: FlexColumnWidth(2),
-                    2: FlexColumnWidth(2),
-                    3: FlexColumnWidth(1),
-                    4: FlexColumnWidth(2),
-                    5: FlexColumnWidth(2),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SizedBox(
+                        width: constraints.maxWidth,
+                        child: Table(
+                          columnWidths: const {
+                            0: FlexColumnWidth(3),
+                            1: FlexColumnWidth(2),
+                            2: FlexColumnWidth(2),
+                            3: FlexColumnWidth(1),
+                            4: FlexColumnWidth(2),
+                            5: FlexColumnWidth(2),
+                          },
+                          children: [
+                            TableRow(
+                              decoration: BoxDecoration(color: BaycelColors.surface),
+                              children: [
+                                _buildTh('PRODUCT'),
+                                _buildTh('SKU'),
+                                _buildTh('CATEGORY'),
+                                _buildTh('STOCK'),
+                                _buildTh('UNIT PRICE'),
+                                _buildTh('STATUS'),
+                              ],
+                            ),
+                            ...products.map((product) => _buildTr(product)),
+                          ],
+                        ),
+                      ),
+                    );
                   },
-                  children: [
-                    TableRow(
-                      decoration: BoxDecoration(color: BaycelColors.surface),
-                      children: [
-                        _buildTh('PRODUCT'),
-                        _buildTh('SKU'),
-                        _buildTh('CATEGORY'),
-                        _buildTh('STOCK'),
-                        _buildTh('UNIT PRICE'),
-                        _buildTh('STATUS'),
-                      ],
-                    ),
-                    ...products.map((product) => _buildTr(product)),
-                  ],
                 ),
               ],
             ),

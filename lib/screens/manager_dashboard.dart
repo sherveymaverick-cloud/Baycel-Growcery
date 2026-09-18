@@ -288,35 +288,39 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
             ))
           else
             Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: List.generate(rates.length, (i) {
-                  final normalizedHeight = maxRate > minRate
-                    ? (rates[i] - minRate) / (maxRate - minRate)
-                    : 0.5;
-                  final barHeight = (40 + normalizedHeight * 80);
-                  return Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 3),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Text('${rates[i].round()}%', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 10)),
-                          SizedBox(height: 4),
-                          Container(
-                            height: barHeight,
-                            decoration: BoxDecoration(
-                              color: BaycelColors.viz5,
-                              borderRadius: BorderRadius.circular(BaycelRadius.md),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: List.generate(rates.length, (i) {
+                    final normalizedHeight = maxRate > minRate
+                      ? (rates[i] - minRate) / (maxRate - minRate)
+                      : 0.5;
+                    final barHeight = (40 + normalizedHeight * 80);
+                    return SizedBox(
+                      width: 44,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 3),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Text('${rates[i].round()}%', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 10)),
+                            SizedBox(height: 4),
+                            Container(
+                              height: barHeight,
+                              decoration: BoxDecoration(
+                                color: BaycelColors.viz5,
+                                borderRadius: BorderRadius.circular(BaycelRadius.md),
+                              ),
                             ),
-                          ),
-                          SizedBox(height: 6),
-                          Text(labels[i], style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
-                        ],
+                            SizedBox(height: 6),
+                            Text(labels[i], style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                }),
+                    );
+                  }),
+                ),
               ),
             ),
         ],
@@ -425,32 +429,42 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
               child: Text('No pending deliveries', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)),
             ))
           else
-            Table(
-              columnWidths: {
-                0: FlexColumnWidth(3),
-                1: FlexColumnWidth(2),
-                2: FlexColumnWidth(2),
-                3: FlexColumnWidth(2),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: constraints.maxWidth,
+                    child: Table(
+                      columnWidths: {
+                        0: FlexColumnWidth(3),
+                        1: FlexColumnWidth(2),
+                        2: FlexColumnWidth(2),
+                        3: FlexColumnWidth(2),
+                      },
+                      children: [
+                        TableRow(
+                          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: BaycelColors.divider))),
+                          children: [
+                            _buildDeliveryTh('SUPPLIER'),
+                            _buildDeliveryTh('ITEMS'),
+                            _buildDeliveryTh('RECEIVED BY'),
+                            _buildDeliveryTh('STATUS'),
+                          ],
+                        ),
+                        ...deliveries.take(3).map((d) => _buildDeliveryTr(
+                          supplier: d.supplierName,
+                          items: '${d.items.length} SKUs',
+                          receivedBy: d.receivedBy ?? '\u2014',
+                          status: d.status,
+                        )),
+                      ],
+                    ),
+                  ),
+                );
               },
-              children: [
-                TableRow(
-                  decoration: BoxDecoration(border: Border(bottom: BorderSide(color: BaycelColors.divider))),
-                  children: [
-                    _buildDeliveryTh('SUPPLIER'),
-                    _buildDeliveryTh('ITEMS'),
-                    _buildDeliveryTh('RECEIVED BY'),
-                    _buildDeliveryTh('STATUS'),
-                  ],
-                ),
-                ...deliveries.take(3).map((d) => _buildDeliveryTr(
-                  supplier: d.supplierName,
-                  items: '${d.items.length} SKUs',
-                  receivedBy: d.receivedBy ?? '\u2014',
-                  status: d.status,
-                )),
-              ],
             ),
-        ],
+          ],
       ),
     );
   }
@@ -485,51 +499,9 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
         ),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: 9),
-          child: _buildStatusPill(status),
+          child: DeliveryStatusPill(status: status),
         ),
       ],
-    );
-  }
-
-  Widget _buildStatusPill(DeliveryStatus status) {
-    Color bgColor;
-    Color textColor;
-    String label;
-
-    switch (status) {
-      case DeliveryStatus.delivered:
-        bgColor = BaycelColors.success.withValues(alpha: 0.12);
-        textColor = BaycelColors.success;
-        label = 'Verified';
-      case DeliveryStatus.pending:
-        bgColor = BaycelColors.marigoldDark.withValues(alpha: 0.18);
-        textColor = BaycelColors.marigoldDark;
-        label = 'Pending';
-      case DeliveryStatus.inTransit:
-        bgColor = BaycelColors.blue.withValues(alpha: 0.1);
-        textColor = BaycelColors.blue;
-        label = 'In Transit';
-      case DeliveryStatus.discrepancy:
-        bgColor = BaycelColors.crimson.withValues(alpha: 0.1);
-        textColor = BaycelColors.crimsonDark;
-        label = '2 short';
-      case DeliveryStatus.cancelled:
-        bgColor = BaycelColors.textDisabled.withValues(alpha: 0.12);
-        textColor = BaycelColors.textDisabled;
-        label = 'Cancelled';
-    }
-
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.sm, vertical: BaycelSpacing.xxs + 1),
-      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(BaycelRadius.full)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(width: 5, height: 5, decoration: BoxDecoration(color: textColor, shape: BoxShape.circle)),
-          SizedBox(width: BaycelSpacing.xxs + 2),
-          Text(label, style: BaycelTypography.labelSm.copyWith(color: textColor, fontSize: 10.5)),
-        ],
-      ),
     );
   }
 }
@@ -599,7 +571,7 @@ class _Pill extends StatelessWidget {
         children: [
           Container(width: 5, height: 5, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
           SizedBox(width: BaycelSpacing.xxs + 2),
-          Text(label, style: BaycelTypography.labelSm.copyWith(fontSize: 10.5, color: color)),
+          Text(label, style: BaycelTypography.labelXs.copyWith(color: color)),
         ],
       ),
     );

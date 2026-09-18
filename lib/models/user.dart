@@ -73,7 +73,6 @@ class StoreUser {
   final String name;
   final String email;
   final UserRole role;
-  final String position;
   final double rate;
   final int payday;
   final WorkSchedule schedule;
@@ -87,7 +86,6 @@ class StoreUser {
     required this.name,
     required this.email,
     required this.role,
-    required this.position,
     required this.rate,
     this.payday = 15,
     required this.schedule,
@@ -102,7 +100,6 @@ class StoreUser {
       'name': name,
       'email': email,
       'role': role.value,
-      'position': position,
       'rate': rate,
       'payday': payday,
       'schedule': schedule.toMap(),
@@ -119,7 +116,6 @@ class StoreUser {
       name: map['name'] ?? '',
       email: map['email'] ?? '',
       role: UserRoleX.fromValue(map['role'] ?? ''),
-      position: map['position'] ?? '',
       rate: (map['rate'] ?? 0).toDouble(),
       payday: map['payday'] ?? 15,
       schedule: WorkSchedule.fromMap(map['schedule'] ?? const {}),

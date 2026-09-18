@@ -301,52 +301,55 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             child: Text('Attendance Log', style: BaycelTypography.headlineMd),
           ),
           Divider(height: 1, color: BaycelColors.divider),
-          Table(
-            columnWidths: const {
-              0: FlexColumnWidth(3),
-              1: FlexColumnWidth(2),
-              2: FlexColumnWidth(2),
-              3: FlexColumnWidth(2),
-              4: FlexColumnWidth(2),
-              5: FlexColumnWidth(2),
-            },
-            children: [
-              TableRow(
-                decoration: BoxDecoration(color: BaycelColors.surface),
-                children: [
-                  _buildTh('Employee'),
-                  _buildTh('Role'),
-                  _buildTh('Time In'),
-                  _buildTh('Time Out'),
-                  _buildTh('Total Hours'),
-                  _buildTh('Status'),
-                ],
+          if (records.isEmpty)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: BaycelSpacing.xl),
+              child: Center(
+                child: Text('No attendance records for this date.', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted)),
               ),
-              if (records.isEmpty)
-                TableRow(
-                  children: [
-                    TableRowInkWell(
-                      child: Padding(
-                        padding: EdgeInsets.all(BaycelSpacing.xl),
-                        child: Center(
-                          child: Text('No attendance records for this date.', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted)),
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: constraints.maxWidth,
+                    child: Table(
+                      columnWidths: const {
+                        0: FlexColumnWidth(2.5),
+                        1: FlexColumnWidth(1.5),
+                        2: FlexColumnWidth(1.5),
+                        3: FlexColumnWidth(1.5),
+                        4: FlexColumnWidth(1.5),
+                        5: FlexColumnWidth(1.5),
+                        6: FlexColumnWidth(1.5),
+                        7: FlexColumnWidth(1.5),
+                      },
+                      children: [
+                        TableRow(
+                          decoration: BoxDecoration(color: BaycelColors.surface),
+                          children: [
+                            _buildTh('Employee'),
+                            _buildTh('Role'),
+                            _buildTh('Time In'),
+                            _buildTh('Time Out'),
+                            _buildTh('Break In'),
+                            _buildTh('Break Out'),
+                            _buildTh('Hours'),
+                            _buildTh('Status'),
+                          ],
                         ),
-                      ),
+                        ...records.map((r) {
+                          final user = userMap[r.employeeId];
+                          return _buildTr(r, user);
+                        }),
+                      ],
                     ),
-                    SizedBox.shrink(),
-                    SizedBox.shrink(),
-                    SizedBox.shrink(),
-                    SizedBox.shrink(),
-                    SizedBox.shrink(),
-                  ],
-                )
-              else
-                ...records.map((r) {
-                  final user = userMap[r.employeeId];
-                  return _buildTr(r, user);
-                }),
-            ],
-          ),
+                  ),
+                );
+              },
+            ),
         ],
       ),
     );
@@ -382,6 +385,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         Padding(
           padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: 10),
           child: Text((record.timeOut?.isNotEmpty ?? false) ? record.timeOut! : '—', style: BaycelTypography.dataMono.copyWith(fontSize: 13)),
+        ),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: 10),
+          child: Text((record.timeIn2?.isNotEmpty ?? false) ? record.timeIn2! : '—', style: BaycelTypography.dataMono.copyWith(fontSize: 13)),
+        ),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: 10),
+          child: Text((record.timeOut2?.isNotEmpty ?? false) ? record.timeOut2! : '—', style: BaycelTypography.dataMono.copyWith(fontSize: 13)),
         ),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: 10),

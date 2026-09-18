@@ -68,17 +68,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             StaggeredItem(index: 2, child: _buildRolePermissionsCard()),
             SizedBox(height: BaycelSpacing.base),
             StaggeredItem(index: 3, child: _buildSystemTogglesCard()),
-          ] else
+          ] else ...[
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(child: StaggeredItem(index: 1, child: _buildStoreSettingsCard())),
                 SizedBox(width: BaycelSpacing.base),
-                Expanded(child: StaggeredItem(index: 2, child: _buildRolePermissionsCard())),
-                SizedBox(width: BaycelSpacing.base),
                 Expanded(child: StaggeredItem(index: 3, child: _buildSystemTogglesCard())),
               ],
             ),
+            SizedBox(height: BaycelSpacing.base),
+            StaggeredItem(index: 2, child: _buildRolePermissionsCard()),
+          ],
         ],
       ),
     );
@@ -117,10 +118,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             SizedBox(height: BaycelSpacing.md),
             _buildStoreInfoRow('Store Name', _settings?.storeName ?? 'Baycel Growcery'),
-            Divider(color: BaycelColors.divider.withValues(alpha: 0.5)),
             _buildStoreInfoRow('Default Currency', _settings?.currency == 'PHP' ? 'Philippine Peso (\u20B1)' : _settings?.currency ?? 'PHP'),
-            Divider(color: BaycelColors.divider.withValues(alpha: 0.5)),
-            _buildStoreInfoRow('Timezone', _settings?.timezone == 'Asia/Manila' ? 'Asia/Manila (UTC+8)' : _settings?.timezone ?? 'Asia/Manila'),
+            _buildStoreInfoRow('Timezone', _settings?.timezone == 'Asia/Manila' ? 'Asia/Manila (UTC+8)' : _settings?.timezone ?? 'Asia/Manila', showBorder: false),
           ],
         ),
       ),
@@ -128,6 +127,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildRolePermissionsCard() {
+    final roles = [
+      ('Owner', 'Full access to all modules', BaycelColors.crimson),
+      ('Manager', 'Inventory, deliveries, reports', BaycelColors.marigoldDark),
+      ('Cashier', 'Sales counter, attendance', BaycelColors.viz5),
+      ('Bagger', 'Absence forms, attendance', BaycelColors.blue),
+      ('Bodegero', 'Stock-in, stock-out, deliveries', BaycelColors.viz4),
+      ('Delivery Checker', 'Create/verify deliveries', BaycelColors.viz2),
+      ('Merchandiser', 'Assigned products, stock-out', BaycelColors.viz1),
+    ];
+
     return Container(
       decoration: BaycelComponents.card,
       child: Padding(
@@ -143,19 +152,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
             SizedBox(height: BaycelSpacing.md),
-            _buildRoleRow('Owner', 'Full access to all modules', BaycelColors.crimson),
-            Divider(color: BaycelColors.divider.withValues(alpha: 0.5)),
-            _buildRoleRow('Manager', 'Inventory, deliveries, reports', BaycelColors.marigoldDark),
-            Divider(color: BaycelColors.divider.withValues(alpha: 0.5)),
-            _buildRoleRow('Cashier', 'Sales counter, attendance', BaycelColors.viz5),
-            Divider(color: BaycelColors.divider.withValues(alpha: 0.5)),
-            _buildRoleRow('Bagger', 'Absence forms, attendance', BaycelColors.blue),
-            Divider(color: BaycelColors.divider.withValues(alpha: 0.5)),
-            _buildRoleRow('Bodegero', 'Stock-in, stock-out', BaycelColors.viz4),
-            Divider(color: BaycelColors.divider.withValues(alpha: 0.5)),
-            _buildRoleRow('Delivery Checker', 'Create/verify deliveries', BaycelColors.viz2),
-            Divider(color: BaycelColors.divider.withValues(alpha: 0.5)),
-            _buildRoleRow('Merchandiser', 'Assigned products, stock-out', BaycelColors.viz1),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth > 400;
+                if (isWide) {
+                  return Wrap(
+                    spacing: BaycelSpacing.base,
+                    runSpacing: BaycelSpacing.sm,
+                    children: roles.map((r) => SizedBox(
+                      width: (constraints.maxWidth - BaycelSpacing.base) / 2,
+                      child: _buildRoleRow(r.$1, r.$2, r.$3),
+                    )).toList(),
+                  );
+                }
+                return Column(
+                  children: [
+                    for (int i = 0; i < roles.length; i++)
+                      _buildRoleRow(roles[i].$1, roles[i].$2, roles[i].$3, showBorder: i < roles.length - 1),
+                  ],
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -190,7 +207,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _saveSettings();
               },
             ),
-            Divider(color: BaycelColors.divider.withValues(alpha: 0.5)),
             _buildToggleRow(
               title: 'Attendance Notifications',
               description: 'Alert on tardiness and absences',
@@ -202,7 +218,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _saveSettings();
               },
             ),
-            Divider(color: BaycelColors.divider.withValues(alpha: 0.5)),
             _buildToggleRow(
               title: 'Auto Backup',
               description: 'Automatically backup data daily',
@@ -213,6 +228,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 });
                 _saveSettings();
               },
+              showBorder: false,
             ),
           ],
         ),
@@ -220,9 +236,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildStoreInfoRow(String label, String value) {
-    return Padding(
+  Widget _buildStoreInfoRow(String label, String value, {bool showBorder = true}) {
+    return Container(
       padding: EdgeInsets.symmetric(vertical: BaycelSpacing.sm),
+      decoration: showBorder ? BoxDecoration(
+        border: Border(bottom: BorderSide(color: BaycelColors.divider.withValues(alpha: 0.5), width: 0.5)),
+      ) : null,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -233,9 +252,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildRoleRow(String role, String permissions, Color color) {
-    return Padding(
+  Widget _buildRoleRow(String role, String permissions, Color color, {bool showBorder = true}) {
+    return Container(
       padding: EdgeInsets.symmetric(vertical: BaycelSpacing.sm),
+      decoration: showBorder ? BoxDecoration(
+        border: Border(bottom: BorderSide(color: BaycelColors.divider.withValues(alpha: 0.5), width: 0.5)),
+      ) : null,
       child: Row(
         children: [
           Container(
@@ -262,9 +284,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String description,
     required bool value,
     required ValueChanged<bool> onChanged,
+    bool showBorder = true,
   }) {
-    return Padding(
+    return Container(
       padding: EdgeInsets.symmetric(vertical: BaycelSpacing.sm),
+      decoration: showBorder ? BoxDecoration(
+        border: Border(bottom: BorderSide(color: BaycelColors.divider.withValues(alpha: 0.5), width: 0.5)),
+      ) : null,
       child: Row(
         children: [
           Expanded(

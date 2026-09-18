@@ -64,6 +64,8 @@ class AttendanceRecord {
   final String date;
   final String timeIn;
   final String? timeOut;
+  final String? timeIn2;
+  final String? timeOut2;
   final double totalHours;
   final int lateMinutes;
   final int undertimeMinutes;
@@ -76,6 +78,8 @@ class AttendanceRecord {
     required this.date,
     required this.timeIn,
     this.timeOut,
+    this.timeIn2,
+    this.timeOut2,
     this.totalHours = 0,
     this.lateMinutes = 0,
     this.undertimeMinutes = 0,
@@ -89,6 +93,8 @@ class AttendanceRecord {
       'date': date,
       'timeIn': timeIn,
       'timeOut': timeOut,
+      'timeIn2': timeIn2,
+      'timeOut2': timeOut2,
       'totalHours': totalHours,
       'lateMinutes': lateMinutes,
       'undertimeMinutes': undertimeMinutes,
@@ -104,6 +110,8 @@ class AttendanceRecord {
       date: map['date'] ?? '',
       timeIn: map['timeIn'] ?? '',
       timeOut: map['timeOut'],
+      timeIn2: map['timeIn2'],
+      timeOut2: map['timeOut2'],
       totalHours: (map['totalHours'] ?? 0).toDouble(),
       lateMinutes: map['lateMinutes'] ?? 0,
       undertimeMinutes: map['undertimeMinutes'] ?? 0,
