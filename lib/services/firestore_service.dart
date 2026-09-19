@@ -8,6 +8,7 @@ import '../models/attendance.dart';
 import '../models/absence_form.dart';
 import '../models/payroll.dart';
 import '../models/settings.dart';
+import 'notification_service.dart';
 import '../models/cash_advance.dart';
 
 class FirestoreService {
@@ -84,6 +85,9 @@ class FirestoreService {
 
   Future<void> saveProduct(Product product) async {
     await _products.doc(product.id).set(product.toMap(), SetOptions(merge: true));
+    if (product.stockQuantity <= product.reorderLevel && product.stockQuantity > 0) {
+      await NotificationService.sendLowStockAlert(product.name, product.stockQuantity, product.reorderLevel);
+    }
   }
 
   Stream<List<Product>> getProducts() {
@@ -146,11 +150,11 @@ class FirestoreService {
   Stream<List<StockMovement>> getStockMovementsByUser(String userId) {
     return _stockMovements
         .where('performedBy', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => StockMovement.fromMap(doc.id, doc.data() as Map<String, dynamic>))
-            .toList());
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt)));
   }
 
   // ── Deliveries ──────────────────────────────────
@@ -219,12 +223,13 @@ class FirestoreService {
   Future<AttendanceRecord?> getLatestAttendance(String employeeId) async {
     final query = await _attendance
         .where('employeeId', isEqualTo: employeeId)
-        .orderBy('date', descending: true)
-        .limit(1)
         .get();
     if (query.docs.isEmpty) return null;
-    final doc = query.docs.first;
-    return AttendanceRecord.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+    final records = query.docs
+        .map((doc) => AttendanceRecord.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    return records.first;
   }
 
   Future<AttendanceRecord?> getTodaysAttendance(String employeeId) async {
@@ -245,6 +250,7 @@ class FirestoreService {
   Future<void> addAbsenceForm(AbsenceForm form) async {
     try {
       await _absenceForms.add(form.toMap());
+      await NotificationService.sendAbsenceRequest(form.employeeName, form.reason, form.employeeId);
     } catch (e) {
       throw Exception('Failed to submit absence form. Please try again.');
     }
@@ -324,6 +330,7 @@ class FirestoreService {
   Future<void> addCashAdvance(CashAdvance advance) async {
     try {
       await _cashAdvances.add(advance.toMap());
+      await NotificationService.sendCashAdvanceRequest(advance.employeeName, advance.amount, advance.employeeId);
     } catch (e) {
       throw Exception('Failed to submit cash advance. Please try again.');
     }
@@ -341,11 +348,11 @@ class FirestoreService {
   Stream<List<CashAdvance>> getCashAdvancesByUser(String userId) {
     return _cashAdvances
         .where('employeeId', isEqualTo: userId)
-        .orderBy('requestedAt', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => CashAdvance.fromMap(doc.id, doc.data() as Map<String, dynamic>))
-            .toList());
+            .toList()
+          ..sort((a, b) => b.requestedAt.compareTo(a.requestedAt)));
   }
 
   Future<void> updateCashAdvance(String id, Map<String, dynamic> data) async {

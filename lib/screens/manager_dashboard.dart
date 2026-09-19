@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../theme.dart';
 import '../widgets/shared_widgets.dart';
 import '../widgets/animated_widgets.dart';
+import '../widgets/floor_staff_shared_widgets.dart';
 import '../services/firestore_service.dart';
 import '../models/product.dart';
 import '../models/delivery.dart';
 import '../models/user.dart';
 import '../models/attendance.dart';
+import '../models/cash_advance.dart';
+import 'floor_staff/delivery_scanner_screen.dart';
 
 class ManagerDashboard extends StatefulWidget {
   const ManagerDashboard({super.key});
@@ -51,11 +55,94 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
           Text('Store operations overview for Baycel Growcery.',
             style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary)),
           SizedBox(height: BaycelSpacing.lg),
+          _buildScannerSection(),
+          SizedBox(height: BaycelSpacing.lg),
           _buildStatGrid(),
           SizedBox(height: BaycelSpacing.lg),
           _buildChartsRow(),
           SizedBox(height: BaycelSpacing.lg),
           _buildBottomRow(),
+          SizedBox(height: BaycelSpacing.lg),
+          CashAdvanceCard(onSubmit: (amount, reason) async {
+            try {
+              final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+              await _firestore.addCashAdvance(CashAdvance(
+                id: '',
+                employeeId: uid,
+                employeeName: _userName,
+                amount: double.tryParse(amount) ?? 0,
+                reason: reason,
+                requestedAt: DateTime.now(),
+              ));
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Cash advance request submitted')));
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Unable to submit request. Please try again.'), backgroundColor: BaycelColors.error),
+                );
+              }
+            }
+          }),
+          SizedBox(height: BaycelSpacing.lg),
+          MyRequestsCard(requestsStream: _firestore.getCashAdvancesByUser(FirebaseAuth.instance.currentUser?.uid ?? '')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScannerSection() {
+    return Container(
+      padding: EdgeInsets.all(BaycelSpacing.base),
+      decoration: BaycelComponents.card,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Quick Actions', style: BaycelTypography.headlineMd),
+          SizedBox(height: BaycelSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.qr_code_scanner,
+                  label: 'Scan Barcode',
+                  onTap: () => _scanBarcode(),
+                ),
+              ),
+              SizedBox(width: BaycelSpacing.md),
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.document_scanner_outlined,
+                  label: 'Scan Paper List',
+                  onTap: () => _scanPaperList(),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _scanPaperList() async {
+    final result = await Navigator.push<List<Map<String, String>>>(
+      context,
+      MaterialPageRoute(builder: (_) => const DeliveryScannerScreen()),
+    );
+    if (result != null && result.isNotEmpty && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${result.length} items scanned')),
+      );
+    }
+  }
+
+  void _scanBarcode() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Barcode Scanner'),
+        content: Text('Barcode scanner will open here. Point camera at barcode.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Close')),
         ],
       ),
     );
@@ -68,6 +155,11 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
         final products = productSnap.data ?? [];
         final totalStock = products.fold<int>(0, (sum, p) => sum + p.stockQuantity);
         final lowStock = products.where((p) => p.stockQuantity <= p.reorderLevel).length;
+        final categories = <String, int>{};
+        for (final p in products) {
+          categories[p.category] = (categories[p.category] ?? 0) + p.stockQuantity;
+        }
+        final catCount = categories.length;
 
         return StreamBuilder<List<Delivery>>(
           stream: _firestore.getDeliveries(),
@@ -80,7 +172,8 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
               stream: _firestore.getUsers(),
               builder: (context, userSnap) {
                 final users = userSnap.data ?? [];
-                final totalEmployees = users.length;
+                final employees = users.where((u) => u.role != UserRole.owner).toList();
+                final totalEmployees = employees.length;
 
                 return StreamBuilder<List<AttendanceRecord>>(
                   stream: _firestore.getAttendance(),
@@ -88,58 +181,53 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
                     final records = attSnap.data ?? [];
                     final today = DateTime.now();
                     final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-                    final todayPresent = records.where((r) => r.date == todayStr && r.timeOut == null).length;
-                    final present = todayPresent > 0 ? todayPresent : (totalEmployees * 0.85).round();
+                    final present = records.where((r) => r.date == todayStr && r.timeOut == null).length;
                     final onLeave = (totalEmployees - present).clamp(0, totalEmployees);
-                    final categories = <String, int>{};
-                    for (final p in products) {
-                      categories[p.category] = (categories[p.category] ?? 0) + p.stockQuantity;
-                    }
-                    final catCount = categories.length;
+
+                    final statCards = [
+                      BaycelStatCard(
+                        icon: Icons.inventory_2_outlined,
+                        iconColor: BaycelColors.viz4,
+                        value: '$totalStock',
+                        title: 'Products in Stock',
+                        subtitle: 'Across $catCount categories',
+                        subtitleColor: BaycelColors.textMuted,
+                      ),
+                      BaycelStatCard(
+                        icon: Icons.warning_amber_rounded,
+                        iconColor: BaycelColors.crimson,
+                        value: '$lowStock',
+                        title: 'Low-Stock Alerts',
+                        subtitle: lowStock > 0 ? 'Needs reordering' : 'All stocked',
+                        subtitleColor: lowStock > 0 ? BaycelColors.crimson : BaycelColors.success,
+                      ),
+                      BaycelStatCard(
+                        icon: Icons.local_shipping_outlined,
+                        iconColor: BaycelColors.blue,
+                        value: '$pending',
+                        title: 'Deliveries Pending',
+                        subtitle: pending > 0 ? 'Awaiting verification' : 'All delivered',
+                        subtitleColor: BaycelColors.textMuted,
+                      ),
+                      BaycelStatCard(
+                        icon: Icons.groups_outlined,
+                        iconColor: BaycelColors.viz5,
+                        value: '$present / $totalEmployees',
+                        title: 'Employees Present',
+                        subtitle: '$onLeave on leave',
+                        subtitleColor: BaycelColors.textMuted,
+                      ),
+                    ];
 
                     return LayoutBuilder(
                       builder: (context, constraints) {
                         final crossCount = constraints.maxWidth > 900 ? 4 : 2;
-                        final statCards = [
-                          BaycelStatCard(
-                            icon: Icons.inventory_2_outlined,
-                            iconColor: BaycelColors.viz4,
-                            value: '$totalStock',
-                            title: 'Products in Stock',
-                            subtitle: 'Across $catCount categories',
-                            subtitleColor: BaycelColors.textMuted,
-                          ),
-                          BaycelStatCard(
-                            icon: Icons.warning_amber_rounded,
-                            iconColor: BaycelColors.crimson,
-                            value: '$lowStock',
-                            title: 'Low-Stock Alerts',
-                            subtitle: lowStock > 0 ? 'Needs reordering' : 'All stocked',
-                            subtitleColor: lowStock > 0 ? BaycelColors.crimson : BaycelColors.success,
-                          ),
-                          BaycelStatCard(
-                            icon: Icons.local_shipping_outlined,
-                            iconColor: BaycelColors.blue,
-                            value: '$pending',
-                            title: 'Deliveries Pending',
-                            subtitle: pending > 0 ? 'Awaiting verification' : 'All delivered',
-                            subtitleColor: BaycelColors.textMuted,
-                          ),
-                          BaycelStatCard(
-                            icon: Icons.groups_outlined,
-                            iconColor: BaycelColors.viz5,
-                            value: '$present / $totalEmployees',
-                            title: 'Employees Present',
-                            subtitle: '$onLeave on leave',
-                            subtitleColor: BaycelColors.textMuted,
-                          ),
-                        ];
                         return GridView.count(
                           shrinkWrap: true,
                           crossAxisCount: crossCount,
                           crossAxisSpacing: BaycelSpacing.md,
                           mainAxisSpacing: BaycelSpacing.md,
-                          childAspectRatio: 1.8,
+                          childAspectRatio: crossCount == 1 ? 1.8 : 2.0,
                           physics: const NeverScrollableScrollPhysics(),
                           children: statCards.asMap().entries.map((e) =>
                             StaggeredItem(index: e.key, child: e.value),
@@ -167,42 +255,53 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
           categories[p.category] = (categories[p.category] ?? 0) + p.stockQuantity;
         }
 
-        return StreamBuilder<List<AttendanceRecord>>(
-          stream: _firestore.getAttendance(),
-          builder: (context, attSnap) {
-            final records = attSnap.data ?? [];
-            final now = DateTime.now();
-            final totalEmployees = 26;
-            final dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-            final attendanceRates = <double>[];
+        return StreamBuilder<List<StoreUser>>(
+          stream: _firestore.getUsers(),
+          builder: (context, userSnap) {
+            final users = userSnap.data ?? [];
+            final totalEmployees = users.where((u) => u.role != UserRole.owner).length;
 
-            for (int i = 6; i >= 0; i--) {
-              final day = now.subtract(Duration(days: i));
-              final dateStr = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
-              final present = records.where((r) => r.date == dateStr && r.timeOut == null).length;
-              final rate = totalEmployees > 0 ? (present / totalEmployees * 100).clamp(70.0, 100.0) : 85.0;
-              attendanceRates.add(rate);
-            }
+            return StreamBuilder<List<AttendanceRecord>>(
+              stream: _firestore.getAttendance(),
+              builder: (context, attSnap) {
+                final records = attSnap.data ?? [];
+                final now = DateTime.now();
+                final dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                final attendanceRates = <double>[];
 
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                final isWide = constraints.maxWidth > 700;
-                if (isWide) {
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(flex: 14, child: _buildStockChart(categories)),
-                      SizedBox(width: BaycelSpacing.base),
-                      Expanded(flex: 10, child: _buildAttendanceChart(dayLabels, attendanceRates)),
-                    ],
-                  );
+                for (int i = 6; i >= 0; i--) {
+                  final day = now.subtract(Duration(days: i));
+                  final dateStr = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+                  final present = records.where((r) => r.date == dateStr && r.timeOut == null).length;
+                  final rate = totalEmployees > 0 ? (present / totalEmployees * 100).clamp(0.0, 100.0) : 0.0;
+                  attendanceRates.add(rate);
                 }
-                return Column(
-                  children: [
-                    _buildStockChart(categories),
-                    SizedBox(height: BaycelSpacing.md),
-                    _buildAttendanceChart(dayLabels, attendanceRates),
-                  ],
+
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    if (constraints.maxWidth < 700) {
+                      return SizedBox(
+                        height: 320,
+                        child: Column(
+                          children: [
+                            _buildStockChart(categories),
+                            SizedBox(height: BaycelSpacing.base),
+                            Expanded(child: _buildAttendanceChart(dayLabels, attendanceRates)),
+                          ],
+                        ),
+                      );
+                    }
+                    return IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(flex: 10, child: _buildStockChart(categories)),
+                          SizedBox(width: BaycelSpacing.base),
+                          Expanded(flex: 12, child: _buildAttendanceChart(dayLabels, attendanceRates)),
+                        ],
+                      ),
+                    );
+                  },
                 );
               },
             );
@@ -270,8 +369,9 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
   }
 
   Widget _buildAttendanceChart(List<String> labels, List<double> rates) {
-    final maxRate = rates.isEmpty ? 100.0 : rates.reduce((a, b) => a > b ? a : b);
-    final minRate = rates.isEmpty ? 70.0 : rates.reduce((a, b) => a < b ? a : b);
+    final maxRate = rates.isEmpty ? 0.0 : rates.reduce((a, b) => a > b ? a : b);
+    final minRate = rates.isEmpty ? 0.0 : rates.reduce((a, b) => a < b ? a : b);
+    final range = maxRate - minRate;
 
     return Container(
       padding: EdgeInsets.all(BaycelSpacing.base),
@@ -280,47 +380,42 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Attendance Rate', style: BaycelTypography.headlineMd),
-          SizedBox(height: BaycelSpacing.base),
-          if (rates.isEmpty)
-            Center(child: Padding(
-              padding: EdgeInsets.all(BaycelSpacing.xl),
-              child: Text('No attendance data', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)),
-            ))
+          SizedBox(height: BaycelSpacing.sm),
+          if (rates.isEmpty || maxRate == 0)
+            Expanded(
+              child: Center(child: Text('No attendance data', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled))),
+            )
           else
             Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: List.generate(rates.length, (i) {
-                    final normalizedHeight = maxRate > minRate
-                      ? (rates[i] - minRate) / (maxRate - minRate)
-                      : 0.5;
-                    final barHeight = (40 + normalizedHeight * 80);
-                    return SizedBox(
-                      width: 44,
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 3),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Text('${rates[i].round()}%', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 10)),
-                            SizedBox(height: 4),
-                            Container(
-                              height: barHeight,
-                              decoration: BoxDecoration(
-                                color: BaycelColors.viz5,
-                                borderRadius: BorderRadius.circular(BaycelRadius.md),
-                              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: List.generate(rates.length, (i) {
+                  final normalizedHeight = range > 0
+                    ? (rates[i] - minRate) / range
+                    : 0.5;
+                  final barHeight = 30.0 + normalizedHeight * 80.0;
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 3),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text('${rates[i].round()}%', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 9)),
+                          SizedBox(height: 3),
+                          Container(
+                            height: barHeight,
+                            decoration: BoxDecoration(
+                              color: BaycelColors.viz5,
+                              borderRadius: BorderRadius.circular(BaycelRadius.md),
                             ),
-                            SizedBox(height: 6),
-                            Text(labels[i], style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
-                          ],
-                        ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(labels[i], style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 10)),
+                        ],
                       ),
-                    );
-                  }),
-                ),
+                    ),
+                  );
+                }),
               ),
             ),
         ],
@@ -345,23 +440,24 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
 
             return LayoutBuilder(
               builder: (context, constraints) {
-                final isWide = constraints.maxWidth > 700;
-                if (isWide) {
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                if (constraints.maxWidth < 700) {
+                  return Column(
                     children: [
-                      Expanded(flex: 10, child: _buildNeedsReordering(lowStockProducts)),
-                      SizedBox(width: BaycelSpacing.base),
-                      Expanded(flex: 13, child: _buildDeliveriesAwaiting(pendingDeliveries)),
+                      _buildNeedsReordering(lowStockProducts),
+                      SizedBox(height: BaycelSpacing.base),
+                      _buildDeliveriesAwaiting(pendingDeliveries),
                     ],
                   );
                 }
-                return Column(
-                  children: [
-                    _buildNeedsReordering(lowStockProducts),
-                    SizedBox(height: BaycelSpacing.md),
-                    _buildDeliveriesAwaiting(pendingDeliveries),
-                  ],
+                return IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(flex: 10, child: _buildNeedsReordering(lowStockProducts)),
+                      SizedBox(width: BaycelSpacing.base),
+                      Expanded(flex: 15, child: _buildDeliveriesAwaiting(pendingDeliveries)),
+                    ],
+                  ),
                 );
               },
             );
@@ -573,6 +669,40 @@ class _Pill extends StatelessWidget {
           SizedBox(width: BaycelSpacing.xxs + 2),
           Text(label, style: BaycelTypography.labelXs.copyWith(color: color)),
         ],
+      ),
+    );
+  }
+}
+
+class _QuickActionCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickActionCard({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.all(BaycelSpacing.base),
+        decoration: BoxDecoration(
+          color: BaycelColors.surface,
+          borderRadius: BorderRadius.circular(BaycelRadius.md),
+          border: Border.all(color: BaycelColors.divider),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 28, color: BaycelColors.crimson),
+            SizedBox(height: BaycelSpacing.sm),
+            Text(label, style: BaycelTypography.labelSm.copyWith(fontWeight: FontWeight.w600), textAlign: TextAlign.center),
+          ],
+        ),
       ),
     );
   }

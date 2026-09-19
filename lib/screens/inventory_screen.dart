@@ -113,8 +113,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
     InputDecoration _fieldDeco(String hint) => BaycelComponents.input.copyWith(
       hintText: hint,
       filled: true,
-      fillColor: BaycelColors.card,
+      fillColor: BaycelColors.surface,
       contentPadding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(BaycelRadius.md),
+        borderSide: BorderSide(color: BaycelColors.divider),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(BaycelRadius.md),
+        borderSide: BorderSide(color: BaycelColors.divider),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(BaycelRadius.md),
+        borderSide: BorderSide(color: BaycelColors.crimson),
+      ),
     );
 
     Widget _label(String text, {bool required = false}) {
@@ -125,7 +137,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             Text(text, style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textSecondary, fontSize: 12)),
             if (required) ...[
               SizedBox(width: 3),
-              Text('*', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.error, fontSize: 12)),
+              Text('*', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.crimson, fontSize: 12)),
             ],
           ],
         ),
@@ -135,17 +147,43 @@ class _InventoryScreenState extends State<InventoryScreen> {
     Widget _sectionTitle(String text) {
       return Padding(
         padding: EdgeInsets.only(top: BaycelSpacing.md, bottom: BaycelSpacing.sm),
-        child: Text(text, style: BaycelTypography.labelSm.copyWith(
-          color: BaycelColors.textMuted, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.05)),
+        child: Row(
+          children: [
+            Container(
+              width: 3, height: 14,
+              decoration: BoxDecoration(
+                color: BaycelColors.crimson,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            SizedBox(width: BaycelSpacing.sm),
+            Text(text, style: BaycelTypography.labelSm.copyWith(
+              color: BaycelColors.textPrimary, fontSize: 12, fontWeight: FontWeight.w600)),
+          ],
+        ),
       );
     }
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Add Product', style: BaycelTypography.title),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BaycelRadius.lg)),
+        title: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: BaycelColors.crimson.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(BaycelRadius.md),
+              ),
+              child: Icon(Icons.inventory_2_outlined, color: BaycelColors.crimson, size: 20),
+            ),
+            SizedBox(width: BaycelSpacing.sm),
+            Text('Add Product', style: BaycelTypography.headlineMd),
+          ],
+        ),
         content: SizedBox(
-          width: 360,
+          width: 380,
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -155,11 +193,29 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 _label('Product Name', required: true),
                 TextField(controller: nameController, decoration: _fieldDeco('e.g. Campbell Soup')),
                 SizedBox(height: BaycelSpacing.md),
-                _label('SKU'),
-                TextField(controller: skuController, decoration: _fieldDeco('e.g. CS-001')),
-                SizedBox(height: BaycelSpacing.md),
-                _label('Barcode'),
-                TextField(controller: barcodeController, decoration: _fieldDeco('e.g. 4800000000012')),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _label('SKU'),
+                          TextField(controller: skuController, decoration: _fieldDeco('e.g. CS-001')),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: BaycelSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _label('Barcode'),
+                          TextField(controller: barcodeController, decoration: _fieldDeco('e.g. 4800012')),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
                 SizedBox(height: BaycelSpacing.md),
                 _label('Category'),
                 DropdownButtonFormField<String>(
@@ -169,23 +225,59 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   items: _categories.where((c) => c != 'All').map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                   onChanged: (v) => category = v ?? category,
                 ),
-                _sectionTitle('Stock Settings'),
-                _label('Price'),
-                TextField(controller: priceController, keyboardType: TextInputType.number, decoration: _fieldDeco('0.00')),
+                _sectionTitle('Stock & Pricing'),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _label('Price (\u20B1)'),
+                          TextField(controller: priceController, keyboardType: TextInputType.number, decoration: _fieldDeco('0.00')),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: BaycelSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _label('Unit'),
+                          DropdownButtonFormField<String>(
+                            value: unit,
+                            decoration: _fieldDeco(''),
+                            style: BaycelTypography.body.copyWith(fontSize: 13),
+                            items: ['pcs', 'kg', 'L', 'pack', 'box'].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                            onChanged: (v) => unit = v ?? unit,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
                 SizedBox(height: BaycelSpacing.md),
-                _label('Stock Quantity'),
-                TextField(controller: stockController, keyboardType: TextInputType.number, decoration: _fieldDeco('0')),
-                SizedBox(height: BaycelSpacing.md),
-                _label('Reorder Level'),
-                TextField(controller: reorderController, keyboardType: TextInputType.number, decoration: _fieldDeco('0')),
-                SizedBox(height: BaycelSpacing.md),
-                _label('Unit'),
-                DropdownButtonFormField<String>(
-                  value: unit,
-                  decoration: _fieldDeco(''),
-                  style: BaycelTypography.body.copyWith(fontSize: 13),
-                  items: ['pcs', 'kg', 'L', 'pack', 'box'].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
-                  onChanged: (v) => unit = v ?? unit,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _label('Stock Qty'),
+                          TextField(controller: stockController, keyboardType: TextInputType.number, decoration: _fieldDeco('0')),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: BaycelSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _label('Reorder Level'),
+                          TextField(controller: reorderController, keyboardType: TextInputType.number, decoration: _fieldDeco('0')),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -197,7 +289,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             child: Text('Cancel', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted)),
           ),
           SizedBox(width: BaycelSpacing.sm),
-          ElevatedButton(
+          ElevatedButton.icon(
             onPressed: () async {
               if (nameController.text.trim().isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Enter product name')));
@@ -219,18 +311,93 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 await _firestore.addProduct(product);
                 if (ctx.mounted) {
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${product.name} added')));
+                  _showSuccessDialog('Product Added', '${product.name} has been added to inventory.');
                 }
               } catch (e) {
                 if (ctx.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Unable to add product. Please try again.'), backgroundColor: BaycelColors.error),
-                  );
+                  _showErrorDialog('Failed', 'Unable to add product. Please try again.');
                 }
               }
             },
-            style: BaycelComponents.buttonPrimary,
-            child: Text('Add', style: TextStyle(color: Colors.white)),
+            style: BaycelComponents.buttonPrimary.copyWith(
+              padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: 10)),
+            ),
+            icon: Icon(Icons.add, size: 16, color: Colors.white),
+            label: Text('Add Product', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BaycelRadius.lg)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: BaycelColors.success.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.check_circle, color: BaycelColors.success, size: 48),
+            ),
+            SizedBox(height: BaycelSpacing.md),
+            Text(title, style: BaycelTypography.headlineMd, textAlign: TextAlign.center),
+            SizedBox(height: BaycelSpacing.sm),
+            Text(message, style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary), textAlign: TextAlign.center),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: BaycelComponents.buttonPrimary,
+              child: Text('OK', style: TextStyle(color: Colors.white)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BaycelRadius.lg)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: BaycelColors.error.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.error_outline, color: BaycelColors.error, size: 48),
+            ),
+            SizedBox(height: BaycelSpacing.md),
+            Text(title, style: BaycelTypography.headlineMd, textAlign: TextAlign.center),
+            SizedBox(height: BaycelSpacing.sm),
+            Text(message, style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary), textAlign: TextAlign.center),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: BaycelComponents.buttonPrimary.copyWith(
+                backgroundColor: WidgetStatePropertyAll(BaycelColors.error),
+              ),
+              child: Text('OK', style: TextStyle(color: Colors.white)),
+            ),
           ),
         ],
       ),

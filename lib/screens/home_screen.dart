@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../theme.dart';
 import '../services/auth_service.dart';
+import '../services/session_service.dart';
+import '../widgets/app_notification.dart';
 import 'login_screen.dart';
 import 'owner_dashboard.dart';
 import 'manager_dashboard.dart';
@@ -30,13 +32,15 @@ class _HomeScreenState extends State<HomeScreen> {
   final _searchController = TextEditingController();
   final _searchFocusNode = FocusNode();
 
-  late List<NavigationItem> _navItems;
-  final Map<String, Widget> _dashboardCache = {};
+  late List<NavigationItem> _navItems = [];
+  String _cachedRole = '';
+  final _session = SessionService();
+  final Map<int, Widget> _pageCache = {};
 
   @override
   void initState() {
     super.initState();
-    _detectRole();
+    _loadSession();
   }
 
   @override
@@ -46,7 +50,20 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _detectRole() async {
+  void _loadSession() async {
+    final session = await _session.loadSession();
+    if (session != null && mounted) {
+      setState(() {
+        _currentRole = session['role']!;
+        _userName = session['name']!;
+        _navItems = _getNavItemsForRole(_currentRole);
+        _cachedRole = _currentRole;
+      });
+    }
+    _fetchRoleFromFirestore();
+  }
+
+  void _fetchRoleFromFirestore() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
@@ -56,9 +73,16 @@ class _HomeScreenState extends State<HomeScreen> {
           final data = doc.data() as Map<String, dynamic>;
           final role = data['role'] as String? ?? 'cashier';
           final name = data['name'] as String? ?? user.email?.split('@').first ?? 'User';
+          final email = user.email ?? '';
+          await _session.saveSession(uid: user.uid, role: role, name: name, email: email);
+          if (!mounted) return;
           setState(() {
             _currentRole = role;
             _userName = name;
+            if (_cachedRole != role) {
+              _navItems = _getNavItemsForRole(role);
+              _cachedRole = role;
+            }
           });
         }
       } catch (_) {
@@ -69,7 +93,12 @@ class _HomeScreenState extends State<HomeScreen> {
         } else if (email.contains('manager')) {
           setState(() => _currentRole = 'manager');
         }
-        setState(() => _userName = email.split('@').first);
+        final name = email.split('@').first;
+        setState(() {
+          _userName = name;
+          _navItems = _getNavItemsForRole(_currentRole);
+          _cachedRole = _currentRole;
+        });
       }
     }
   }
@@ -97,8 +126,9 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationItem(icon: Icons.assessment, label: 'Reports', page: const ReportsScreen()),
         ];
       default:
-        _dashboardCache.putIfAbsent('floor_$role', () => FloorStaffDashboard(role: role));
-        final dashboard = _dashboardCache['floor_$role']!;
+        final cacheKey = 'floor_$role'.hashCode;
+        _pageCache.putIfAbsent(cacheKey, () => FloorStaffDashboard(role: role));
+        final dashboard = _pageCache[cacheKey]!;
         final items = [
           NavigationItem(icon: Icons.home, label: 'Home', page: dashboard),
           NavigationItem(icon: Icons.access_time, label: 'Attendance', page: const AttendanceScreen()),
@@ -117,7 +147,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    _navItems = _getNavItemsForRole(_currentRole);
+    if (_navItems.isEmpty) {
+      _navItems = _getNavItemsForRole(_currentRole);
+    }
     if (_currentIndex >= _navItems.length) _currentIndex = 0;
     final isMobile = MediaQuery.of(context).size.width < 600;
 
@@ -259,6 +291,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
                     if (confirmed != true) return;
                     try {
+                      await _session.clearSession();
                       await AuthService().signOut();
                       if (context.mounted) {
                         Navigator.of(context).pushAndRemoveUntil(
@@ -348,12 +381,7 @@ class _HomeScreenState extends State<HomeScreen> {
           SizedBox(width: 16),
           Text(dateStr, style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 12)),
           SizedBox(width: 16),
-          _TopbarIconBtn(
-            icon: Icons.notifications_outlined,
-            hasBadge: false,
-            onTap: () {},
-            tooltip: 'Notifications',
-          ),
+          NotificationBell(),
         ],
       ),
     );
@@ -465,9 +493,8 @@ class _TopbarIconBtn extends StatefulWidget {
   final IconData icon;
   final bool hasBadge;
   final VoidCallback onTap;
-  final String? tooltip;
 
-  const _TopbarIconBtn({required this.icon, required this.hasBadge, required this.onTap, this.tooltip});
+  const _TopbarIconBtn({required this.icon, required this.hasBadge, required this.onTap});
 
   @override
   State<_TopbarIconBtn> createState() => _TopbarIconBtnState();
@@ -562,6 +589,6 @@ class _TopbarIconBtnState extends State<_TopbarIconBtn> with SingleTickerProvide
         ),
       ),
     );
-    return widget.tooltip != null ? Tooltip(message: widget.tooltip!, child: btn) : btn;
+    return btn;
   }
 }

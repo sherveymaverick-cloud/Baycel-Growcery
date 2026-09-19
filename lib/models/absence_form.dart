@@ -28,6 +28,7 @@ class AbsenceForm {
   final DateTime startDate;
   final DateTime endDate;
   final AbsenceStatus status;
+  final bool isPaidLeave;
   final String? managerNote;
   final DateTime? submittedAt;
   final DateTime? reviewedAt;
@@ -40,6 +41,7 @@ class AbsenceForm {
     required this.startDate,
     required this.endDate,
     this.status = AbsenceStatus.pending,
+    this.isPaidLeave = false,
     this.managerNote,
     this.submittedAt,
     this.reviewedAt,
@@ -53,6 +55,7 @@ class AbsenceForm {
       'startDate': startDate,
       'endDate': endDate,
       'status': status.value,
+      'isPaidLeave': isPaidLeave,
       'managerNote': managerNote,
       'submittedAt': submittedAt,
       'reviewedAt': reviewedAt,
@@ -68,6 +71,7 @@ class AbsenceForm {
       startDate: _toDate(map['startDate']) ?? DateTime.now(),
       endDate: _toDate(map['endDate']) ?? DateTime.now(),
       status: AbsenceStatus.fromValue(map['status'] ?? 'pending'),
+      isPaidLeave: map['isPaidLeave'] ?? false,
       managerNote: map['managerNote'],
       submittedAt: _toDate(map['submittedAt']),
       reviewedAt: _toDate(map['reviewedAt']),

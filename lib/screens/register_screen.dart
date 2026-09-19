@@ -16,11 +16,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _rateController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   String _selectedRole = 'cashier';
-  int _selectedPayday = 15;
+  int _selectedPayday = 7;
   String _scheduleStart = '08:00';
   String _scheduleEnd = '17:00';
 
@@ -32,13 +34,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     ('bodegero', 'Bodegero', Color(0xFFF57F17)),
     ('delivery_checker', 'Delivery Checker', Color(0xFF0D47A1)),
     ('merchandiser', 'Merchandiser', Color(0xFF2E7D32)),
-  ];
-
-  static const _hours = [
-    '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
-    '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
-    '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
-    '18:00', '19:00', '20:00', '21:00', '22:00', '23:00',
   ];
 
   int get _passwordStrength {
@@ -90,9 +85,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (result == null || result.user == null) {
         setState(() => _isLoading = false);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Registration failed. Please try again.')),
-          );
+          _showErrorDialog('Registration Failed', 'Unable to create account. Please try again.');
         }
         return;
       }
@@ -111,51 +104,147 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
 
       if (previousUser != null && previousEmail != null && mounted) {
-        final passwordController = TextEditingController();
-        final reAuth = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Re-enter your password'),
-            content: TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(hintText: 'Your password'),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Confirm'),
-              ),
-            ],
-          ),
-        );
-
-        if (reAuth == true && passwordController.text.isNotEmpty) {
+        try {
           await FirebaseAuth.instance.signInWithEmailAndPassword(
             email: previousEmail,
-            password: passwordController.text,
+            password: _confirmPasswordController.text,
           );
+        } catch (e) {
+          setState(() => _isLoading = false);
+          if (mounted) {
+            _showWarningDialog('Password Needed', 'Employee added successfully, but we couldn\'t sign you back in. Please sign in manually.');
+          }
+          return;
         }
-        passwordController.dispose();
       }
 
       setState(() => _isLoading = false);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Employee added successfully.')),
-        );
-        Navigator.of(context).pop();
+        _showSuccessDialog('Account Created', '$name has been added as ${_selectedRole[0].toUpperCase() + _selectedRole.substring(1)}.');
       }
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-        );
+        _showErrorDialog('Registration Failed', e.toString().replaceFirst('Exception: ', ''));
       }
     }
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BaycelRadius.lg)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: BaycelColors.success.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.check_circle, color: BaycelColors.success, size: 56),
+            ),
+            SizedBox(height: BaycelSpacing.md),
+            Text(title, style: BaycelTypography.headlineMd, textAlign: TextAlign.center),
+            SizedBox(height: BaycelSpacing.sm),
+            Text(message, style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary), textAlign: TextAlign.center),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.of(context).pop();
+              },
+              style: BaycelComponents.buttonPrimary,
+              child: Text('OK', style: TextStyle(color: Colors.white)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BaycelRadius.lg)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: BaycelColors.error.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.error_outline, color: BaycelColors.error, size: 56),
+            ),
+            SizedBox(height: BaycelSpacing.md),
+            Text(title, style: BaycelTypography.headlineMd, textAlign: TextAlign.center),
+            SizedBox(height: BaycelSpacing.sm),
+            Text(message, style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary), textAlign: TextAlign.center),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: BaycelComponents.buttonPrimary.copyWith(
+                backgroundColor: WidgetStatePropertyAll(BaycelColors.error),
+              ),
+              child: Text('OK', style: TextStyle(color: Colors.white)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showWarningDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BaycelRadius.lg)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: BaycelColors.marigoldDark.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.warning_amber_rounded, color: BaycelColors.marigoldDark, size: 56),
+            ),
+            SizedBox(height: BaycelSpacing.md),
+            Text(title, style: BaycelTypography.headlineMd, textAlign: TextAlign.center),
+            SizedBox(height: BaycelSpacing.sm),
+            Text(message, style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary), textAlign: TextAlign.center),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.of(context).pop();
+              },
+              style: BaycelComponents.buttonPrimary,
+              child: Text('OK', style: TextStyle(color: Colors.white)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -163,6 +252,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _rateController.dispose();
     super.dispose();
   }
@@ -251,6 +341,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         SizedBox(height: BaycelSpacing.xs),
         _buildPasswordField(),
         _buildPasswordStrengthBar(),
+        SizedBox(height: BaycelSpacing.base),
+        _label('Re-enter Password'),
+        SizedBox(height: BaycelSpacing.xs),
+        _buildConfirmPasswordField(),
       ],
     );
   }
@@ -374,6 +468,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
+  Widget _buildConfirmPasswordField() {
+    return TextFormField(
+      controller: _confirmPasswordController,
+      obscureText: _obscureConfirmPassword,
+      style: BaycelTypography.body.copyWith(fontSize: 13),
+      decoration: _fieldDeco(
+        hintText: 'Re-enter your password',
+        prefixIcon: Padding(
+          padding: EdgeInsets.only(left: BaycelSpacing.md, right: BaycelSpacing.xs),
+          child: Icon(Icons.lock_outline, size: 18, color: BaycelColors.textDisabled),
+        ),
+        suffixIcon: IconButton(
+          onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+          icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility, color: BaycelColors.textMuted, size: 20),
+        ),
+      ),
+      validator: (v) {
+        if (v == null || v.isEmpty) return 'Please re-enter your password.';
+        if (v != _passwordController.text) return 'Passwords do not match.';
+        return null;
+      },
+    );
+  }
+
   Widget _buildPasswordStrengthBar() {
     final strength = _passwordStrength;
     if (strength == 0 && _passwordController.text.isEmpty) return SizedBox.shrink();
@@ -452,6 +570,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Icon(Icons.payments_outlined, size: 18, color: BaycelColors.textDisabled),
         ),
       ),
+      validator: (v) {
+        if (v == null || v.isEmpty) return 'Enter hourly rate.';
+        final rate = double.tryParse(v);
+        if (rate == null) return 'Enter valid number.';
+        if (rate < 0) return 'Rate cannot be negative.';
+        if (rate > 1000) return 'Rate too high. Max \u20B11,000/hr.';
+        return null;
+      },
     );
   }
 
@@ -470,13 +596,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
           style: BaycelTypography.body.copyWith(fontSize: 13),
           dropdownColor: BaycelColors.card,
           items: const [
+            DropdownMenuItem(value: 7, child: Text('Every 7th')),
             DropdownMenuItem(value: 15, child: Text('Every 15th')),
-            DropdownMenuItem(value: 30, child: Text('Every 30th (End of month)')),
           ],
-          onChanged: (v) => setState(() => _selectedPayday = v ?? 15),
+          onChanged: (v) => setState(() => _selectedPayday = v ?? 7),
         ),
       ),
     );
+  }
+
+  TimeOfDay _parseTime(String s) {
+    final parts = s.split(':');
+    return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+  }
+
+  String _formatTime(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  Future<void> _pickTime({required bool isStart}) async {
+    final current = _parseTime(isStart ? _scheduleStart : _scheduleEnd);
+    final picked = await showTimePicker(context: context, initialTime: current);
+    if (picked != null) {
+      setState(() {
+        if (isStart) {
+          _scheduleStart = _formatTime(picked);
+        } else {
+          _scheduleEnd = _formatTime(picked);
+        }
+      });
+    }
   }
 
   Widget _buildScheduleRow() {
@@ -488,24 +636,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             children: [
               _label('Start'),
               SizedBox(height: BaycelSpacing.xs),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base),
-                decoration: BoxDecoration(
-                  color: BaycelColors.card,
-                  border: Border.all(color: BaycelColors.divider),
-                  borderRadius: BorderRadius.circular(BaycelRadius.md),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _scheduleStart,
-                    isExpanded: true,
-                    style: BaycelTypography.body.copyWith(fontSize: 13),
-                    dropdownColor: BaycelColors.card,
-                    items: _hours.map((h) => DropdownMenuItem(value: h, child: Text(h))).toList(),
-                    onChanged: (v) => setState(() => _scheduleStart = v ?? _scheduleStart),
-                  ),
-                ),
-              ),
+              _timePickerButton(_scheduleStart, () => _pickTime(isStart: true)),
             ],
           ),
         ),
@@ -519,28 +650,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
             children: [
               _label('End'),
               SizedBox(height: BaycelSpacing.xs),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base),
-                decoration: BoxDecoration(
-                  color: BaycelColors.card,
-                  border: Border.all(color: BaycelColors.divider),
-                  borderRadius: BorderRadius.circular(BaycelRadius.md),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _scheduleEnd,
-                    isExpanded: true,
-                    style: BaycelTypography.body.copyWith(fontSize: 13),
-                    dropdownColor: BaycelColors.card,
-                    items: _hours.map((h) => DropdownMenuItem(value: h, child: Text(h))).toList(),
-                    onChanged: (v) => setState(() => _scheduleEnd = v ?? _scheduleEnd),
-                  ),
-                ),
-              ),
+              _timePickerButton(_scheduleEnd, () => _pickTime(isStart: false)),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _timePickerButton(String time, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: BaycelSpacing.md),
+        decoration: BoxDecoration(
+          color: BaycelColors.card,
+          border: Border.all(color: BaycelColors.divider),
+          borderRadius: BorderRadius.circular(BaycelRadius.md),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.access_time, size: 18, color: BaycelColors.textDisabled),
+            SizedBox(width: BaycelSpacing.sm),
+            Text(time, style: BaycelTypography.body.copyWith(fontSize: 13)),
+          ],
+        ),
+      ),
     );
   }
 

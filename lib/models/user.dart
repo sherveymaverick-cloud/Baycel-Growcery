@@ -87,7 +87,7 @@ class StoreUser {
     required this.email,
     required this.role,
     required this.rate,
-    this.payday = 15,
+    this.payday = 7,
     required this.schedule,
     required this.rfidCardUID,
     required this.assignedProducts,

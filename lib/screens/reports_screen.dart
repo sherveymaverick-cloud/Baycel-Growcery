@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../widgets/animated_widgets.dart';
 import '../services/firestore_service.dart';
+import '../services/pdf_service.dart';
 import '../models/product.dart';
 import '../models/delivery.dart';
 import '../models/attendance.dart';
@@ -256,13 +257,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   description: 'Daily and weekly revenue and order volume, broken down by category.',
                   icon: Icons.assessment_rounded,
                   iconColor: BaycelColors.crimson,
-                  onGenerate: () => _showReportSummary(context, 'Sales Report', {
+                  summary: {
                     'Today\'s Sales': '\u20B1${todayTotal.toStringAsFixed(0)}',
                     'This Week': '\u20B1${weekTotal.toStringAsFixed(0)}',
                     'This Month': '\u20B1${monthTotal.toStringAsFixed(0)}',
                     'Total Revenue': '\u20B1${totalRevenue.toStringAsFixed(0)}',
                     'Total Transactions': sales.length.toString(),
-                  }),
+                  },
+                  onGenerate: () => PdfService.generateSalesReport(
+                    movements: movements,
+                    dateRange: 'As of ${today.toString().split(' ')[0]}',
+                  ),
                 );
               },
             ),
@@ -281,12 +286,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   description: 'Time-in/out records, lateness, undertime, and overtime by employee and role.',
                   icon: Icons.access_time_rounded,
                   iconColor: BaycelColors.viz5,
-                  onGenerate: () => _showReportSummary(context, 'Attendance Report', {
+                  summary: {
                     'Total Records': attendance.length.toString(),
                     'Present': present.toString(),
                     'Late': late.toString(),
                     'Total Hours': totalHrs.toStringAsFixed(1),
-                  }),
+                  },
+                  onGenerate: () async {
+                    final users = await _firestore.getUsers().first;
+                    if (context.mounted) {
+                      PdfService.generateAttendanceReport(
+                        attendance: attendance,
+                        users: users,
+                        dateRange: 'As of ${DateTime.now().toString().split(' ')[0]}',
+                      );
+                    }
+                  },
                 );
               },
             ),
@@ -302,10 +317,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   description: 'Gross pay, deductions, and net pay totals for any completed pay period.',
                   icon: Icons.receipt_long_rounded,
                   iconColor: BaycelColors.marigoldDark,
-                  onGenerate: () => _showReportSummary(context, 'Payroll Summary', {
+                  summary: {
                     'Total Employees': users.length.toString(),
                     'Roles': users.map((u) => u.role.value).toSet().length.toString(),
-                  }),
+                  },
+                  onGenerate: () async {
+                    final payrolls = await _firestore.getPayrolls().first;
+                    if (context.mounted) {
+                      PdfService.generatePayrollReport(
+                        payrolls: payrolls,
+                        users: users,
+                        dateRange: 'As of ${DateTime.now().toString().split(' ')[0]}',
+                      );
+                    }
+                  },
                 );
               },
             ),
@@ -321,9 +346,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   description: 'Attendance consistency and task completion, ranked by role.',
                   icon: Icons.people_rounded,
                   iconColor: BaycelColors.blue,
-                  onGenerate: () => _showReportSummary(context, 'Employee Performance', {
+                  summary: {
                     'Total Employees': users.length.toString(),
-                  }),
+                  },
+                  onGenerate: () async {
+                    final attendance = await _firestore.getAttendance().first;
+                    if (context.mounted) {
+                      PdfService.generateAttendanceReport(
+                        attendance: attendance,
+                        users: users,
+                        dateRange: 'Performance - ${DateTime.now().toString().split(' ')[0]}',
+                      );
+                    }
+                  },
                 );
               },
             ),
@@ -342,13 +377,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   description: 'Stock levels and reorder alerts across every product category.',
                   icon: Icons.inventory_2_rounded,
                   iconColor: BaycelColors.viz4,
-                  onGenerate: () => _showReportSummary(context, 'Inventory Report', {
+                  summary: {
                     'Total Products': products.length.toString(),
                     'Total Stock Units': totalStock.toString(),
                     'Low Stock Items': lowStock.toString(),
                     'Categories': products.map((p) => p.category).toSet().length.toString(),
                     'Inventory Value': '\u20B1${totalValue.toStringAsFixed(0)}',
-                  }),
+                  },
+                  onGenerate: () => PdfService.generateInventoryReport(
+                    products: products,
+                    dateRange: 'As of ${DateTime.now().toString().split(' ')[0]}',
+                  ),
                 );
               },
             ),
@@ -366,43 +405,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   description: 'Supplier reliability, on-time rate, and discrepancy history by vendor.',
                   icon: Icons.local_shipping_rounded,
                   iconColor: BaycelColors.success,
-                  onGenerate: () => _showReportSummary(context, 'Delivery Report', {
+                  summary: {
                     'Total Deliveries': deliveries.length.toString(),
                     'Verified': verified.toString(),
                     'Discrepancies': discrepancy.toString(),
                     'Pending': deliveries.where((d) => d.status == DeliveryStatus.pending).length.toString(),
-                  }),
+                  },
+                  onGenerate: () => PdfService.generateDeliveryReport(
+                    deliveries: deliveries,
+                    dateRange: 'As of ${DateTime.now().toString().split(' ')[0]}',
+                  ),
                 );
               },
             ),
           ],
         );
       },
-    );
-  }
-
-  void _showReportSummary(BuildContext context, String title, Map<String, String> data) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title, style: BaycelTypography.title),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: data.entries.map((e) => Padding(
-            padding: EdgeInsets.symmetric(vertical: 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(e.key, style: BaycelTypography.body.copyWith(color: BaycelColors.textSecondary)),
-                Text(e.value, style: BaycelTypography.body.copyWith(fontWeight: FontWeight.w600)),
-              ],
-            ),
-          )).toList(),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Close')),
-        ],
-      ),
     );
   }
 }
@@ -413,6 +431,7 @@ class _ReportCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final VoidCallback onGenerate;
+  final Map<String, String>? summary;
 
   const _ReportCard({
     required this.title,
@@ -420,6 +439,7 @@ class _ReportCard extends StatelessWidget {
     required this.icon,
     required this.iconColor,
     required this.onGenerate,
+    this.summary,
   });
 
   @override
@@ -429,34 +449,54 @@ class _ReportCard extends StatelessWidget {
       decoration: BaycelComponents.card,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 32, height: 32,
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(BaycelRadius.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 32, height: 32,
+                      decoration: BoxDecoration(
+                        color: iconColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(BaycelRadius.lg),
+                      ),
+                      child: Icon(icon, size: 15, color: iconColor),
+                    ),
+                    SizedBox(width: BaycelSpacing.sm),
+                    Expanded(child: Text(title, style: BaycelTypography.headlineMd.copyWith(fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  ],
                 ),
-                child: Icon(icon, size: 15, color: iconColor),
-              ),
-              SizedBox(width: BaycelSpacing.sm),
-              Expanded(child: Text(title, style: BaycelTypography.headlineMd.copyWith(fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
-            ],
+                SizedBox(height: BaycelSpacing.xs),
+                Text(description, style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 11.5, height: 1.4), maxLines: 2, overflow: TextOverflow.ellipsis),
+                if (summary != null && summary!.isNotEmpty) ...[
+                  SizedBox(height: BaycelSpacing.xs),
+                  ...summary!.entries.take(3).map((e) => Padding(
+                    padding: EdgeInsets.only(bottom: 3),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(e.key, style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 10)),
+                        Text(e.value, style: BaycelTypography.labelSm.copyWith(fontWeight: FontWeight.w600, fontSize: 10)),
+                      ],
+                    ),
+                  )),
+                ],
+              ],
+            ),
           ),
-          SizedBox(height: BaycelSpacing.xs),
-          Text(description, style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 11.5, height: 1.4), maxLines: 2, overflow: TextOverflow.ellipsis),
-          SizedBox(height: BaycelSpacing.sm),
           SizedBox(
             width: double.infinity,
             height: 32,
-            child: OutlinedButton(
+            child: OutlinedButton.icon(
               style: BaycelComponents.buttonOutlined.copyWith(
-                padding: WidgetStatePropertyAll(EdgeInsets.zero),
+                padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: BaycelSpacing.sm)),
               ),
               onPressed: onGenerate,
-              child: const Text('Generate', style: TextStyle(fontSize: 11)),
+              icon: const Icon(Icons.picture_as_pdf, size: 14),
+              label: const Text('Generate PDF', style: TextStyle(fontSize: 11)),
             ),
           ),
         ],

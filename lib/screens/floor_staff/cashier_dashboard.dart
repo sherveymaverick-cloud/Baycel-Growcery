@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../../theme.dart';
 import '../../widgets/shared_widgets.dart';
 import '../../widgets/floor_staff_helpers.dart';
@@ -7,12 +9,14 @@ import '../../widgets/floor_staff_shared_widgets.dart';
 import '../../services/firestore_service.dart';
 import '../../models/stock_movement.dart';
 import '../../models/cash_advance.dart';
+import '../../models/absence_form.dart';
 import '../../models/attendance.dart';
 
 class CashierDashboard extends StatelessWidget {
   final FirestoreService firestore;
   final String staffName;
-  final void Function(double amount, double expectedCash, double actualCash, String shift, String register) onSubmitSales;
+  final void Function(double amount, double expectedCash, double actualCash, String shift, String register, File receiptImage) onSubmitSales;
+  final void Function(DateTime startDate, DateTime endDate, String reason) onSubmitAbsence;
   final Stream<List<CashAdvance>> cashAdvancesStream;
   final Stream<List<AttendanceRecord>> attendanceStream;
 
@@ -21,6 +25,7 @@ class CashierDashboard extends StatelessWidget {
     required this.firestore,
     required this.staffName,
     required this.onSubmitSales,
+    required this.onSubmitAbsence,
     required this.cashAdvancesStream,
     required this.attendanceStream,
   });
@@ -32,6 +37,10 @@ class CashierDashboard extends StatelessWidget {
         _SalesCounterCard(onSubmit: onSubmitSales),
         SizedBox(height: BaycelSpacing.md),
         _RecentSubmissionsCard(firestore: firestore),
+        SizedBox(height: BaycelSpacing.md),
+        _AbsenceFormCard(onSubmit: onSubmitAbsence),
+        SizedBox(height: BaycelSpacing.md),
+        _AbsenceRequestsCard(firestore: firestore),
         SizedBox(height: BaycelSpacing.md),
         CashAdvanceCard(onSubmit: (amount, reason) async {
           try {
@@ -62,8 +71,197 @@ class CashierDashboard extends StatelessWidget {
   }
 }
 
+class _AbsenceFormCard extends StatefulWidget {
+  final void Function(DateTime startDate, DateTime endDate, String reason) onSubmit;
+
+  const _AbsenceFormCard({required this.onSubmit});
+
+  @override
+  State<_AbsenceFormCard> createState() => _AbsenceFormCardState();
+}
+
+class _AbsenceFormCardState extends State<_AbsenceFormCard> {
+  DateTime? _startDate;
+  DateTime? _endDate;
+  final _reasonController = TextEditingController();
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  void _pickDates() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: now,
+      lastDate: now.add(Duration(days: 365)),
+      initialDateRange: _startDate != null && _endDate != null
+        ? DateTimeRange(start: _startDate!, end: _endDate!)
+        : null,
+    );
+    if (picked != null) {
+      setState(() {
+        _startDate = picked.start;
+        _endDate = picked.end;
+      });
+    }
+  }
+
+  void _submit() {
+    final reason = _reasonController.text.trim();
+    if (_startDate == null || reason.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Select dates and enter a reason')));
+      return;
+    }
+    widget.onSubmit(_startDate!, _endDate ?? _startDate!, reason);
+    _reasonController.clear();
+    setState(() {
+      _startDate = null;
+      _endDate = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dateText = _startDate != null
+      ? _endDate != null && !_startDate!.isAtSameMomentAs(_endDate!)
+        ? '${_startDate!.month}/${_startDate!.day} \u2013 ${_endDate!.month}/${_endDate!.day}'
+        : '${_startDate!.month}/${_startDate!.day}'
+      : '';
+
+    return Container(
+      padding: EdgeInsets.all(BaycelSpacing.base),
+      decoration: BaycelComponents.card,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Submit Absence Form', style: BaycelTypography.title),
+          SizedBox(height: BaycelSpacing.xxs),
+          Text('Requests are reviewed by your Manager',
+            style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 11.5)),
+          SizedBox(height: BaycelSpacing.md),
+          buildFieldLabel('Date(s)'),
+          SizedBox(height: 5),
+          GestureDetector(
+            onTap: _pickDates,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: BaycelColors.card,
+                borderRadius: BorderRadius.circular(BaycelRadius.md),
+                border: Border.all(color: BaycelColors.divider),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.date_range, size: 18, color: BaycelColors.textSecondary),
+                  SizedBox(width: BaycelSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      dateText.isEmpty ? 'Select date range' : dateText,
+                      style: BaycelTypography.body.copyWith(
+                        fontSize: 13,
+                        color: dateText.isEmpty ? BaycelColors.textDisabled : BaycelColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, size: 16, color: BaycelColors.textDisabled),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: BaycelSpacing.md),
+          buildFieldLabel('Reason'),
+          SizedBox(height: 5),
+          TextField(
+            controller: _reasonController,
+            style: BaycelTypography.body.copyWith(fontSize: 13),
+            decoration: BaycelComponents.input.copyWith(
+              hintText: 'Brief reason for absence', filled: true, fillColor: BaycelColors.card),
+          ),
+          SizedBox(height: BaycelSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _submit,
+              style: BaycelComponents.buttonPrimary.copyWith(
+                padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: BaycelSpacing.buttonHorizontal, vertical: BaycelSpacing.buttonVertical)),
+              ),
+              child: Text('Submit Request', style: BaycelTypography.label.copyWith(color: Colors.white, fontSize: 12.5)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AbsenceRequestsCard extends StatelessWidget {
+  final FirestoreService firestore;
+
+  const _AbsenceRequestsCard({required this.firestore});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<AbsenceForm>>(
+      stream: firestore.getAbsenceForms(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            padding: EdgeInsets.all(BaycelSpacing.base),
+            decoration: BaycelComponents.card,
+            child: const SkeletonListTile(),
+          );
+        }
+        final List<AbsenceForm> forms = snapshot.data ?? [];
+        final List<AbsenceForm> myForms = forms.where((AbsenceForm f) =>
+          f.employeeId == FirebaseAuth.instance.currentUser?.uid).take(5).toList();
+
+        return Container(
+          padding: EdgeInsets.all(BaycelSpacing.base),
+          decoration: BaycelComponents.card,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('My Absence Requests', style: BaycelTypography.title),
+              SizedBox(height: BaycelSpacing.sm),
+              if (myForms.isEmpty)
+                Center(child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: BaycelSpacing.lg),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.event_busy, size: 32, color: BaycelColors.textDisabled),
+                      SizedBox(height: BaycelSpacing.sm),
+                      Text('No requests yet', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)),
+                    ],
+                  ),
+                ))
+              else
+                ...myForms.map((f) {
+                  final statusColor = f.status == AbsenceStatus.approved
+                    ? BaycelColors.success
+                    : f.status == AbsenceStatus.rejected
+                      ? BaycelColors.crimson
+                      : BaycelColors.marigoldDark;
+                  return buildAbsenceRequestRow(
+                    f.reason,
+                    'Submitted',
+                    f.status.value[0].toUpperCase() + f.status.value.substring(1),
+                    statusColor,
+                  );
+                }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _SalesCounterCard extends StatefulWidget {
-  final void Function(double amount, double expectedCash, double actualCash, String shift, String register) onSubmit;
+  final void Function(double amount, double expectedCash, double actualCash, String shift, String register, File receiptImage) onSubmit;
 
   const _SalesCounterCard({required this.onSubmit});
 
@@ -75,8 +273,11 @@ class _SalesCounterCardState extends State<_SalesCounterCard> {
   final _salesController = TextEditingController();
   final _expectedCashController = TextEditingController();
   final _actualCashController = TextEditingController();
-  String _selectedShift = 'Morning (7AM\u20133PM)';
+  String _shiftStart = '';
+  String _shiftEnd = '';
   String _selectedRegister = 'Register 1';
+  File? _receiptImage;
+  final _imagePicker = ImagePicker();
 
   @override
   void dispose() {
@@ -114,17 +315,97 @@ class _SalesCounterCardState extends State<_SalesCounterCard> {
               Text('Record today\'s total for your shift',
                 style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 11.5)),
               SizedBox(height: BaycelSpacing.md),
-              buildFieldLabel('Shift'),
+              buildFieldLabel('Shift Time'),
               SizedBox(height: 5),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedShift,
-                decoration: BaycelComponents.input.copyWith(filled: true, fillColor: BaycelColors.card),
-                style: BaycelTypography.body.copyWith(fontSize: 13),
-                items: [
-                  DropdownMenuItem(value: 'Morning (7AM\u20133PM)', child: Text('Morning (7AM\u20133PM)')),
-                  DropdownMenuItem(value: 'Afternoon (3PM\u201311PM)', child: Text('Afternoon (3PM\u201311PM)')),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () async {
+                        final now = TimeOfDay.now();
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: _shiftStart.isNotEmpty
+                            ? TimeOfDay(hour: int.parse(_shiftStart.split(':')[0]), minute: int.parse(_shiftStart.split(':')[1]))
+                            : now,
+                        );
+                        if (picked != null) {
+                          setModalState(() {
+                            _shiftStart = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: BaycelColors.card,
+                          borderRadius: BorderRadius.circular(BaycelRadius.md),
+                          border: Border.all(color: BaycelColors.divider),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.play_arrow_rounded, size: 16, color: BaycelColors.success),
+                            SizedBox(width: BaycelSpacing.xs),
+                            Expanded(
+                              child: Text(
+                                _shiftStart.isEmpty ? 'Start' : _shiftStart,
+                                style: BaycelTypography.body.copyWith(
+                                  fontSize: 13,
+                                  color: _shiftStart.isEmpty ? BaycelColors.textDisabled : BaycelColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.sm),
+                    child: Text('–', style: BaycelTypography.body.copyWith(color: BaycelColors.textMuted)),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () async {
+                        final now = TimeOfDay.now();
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: _shiftEnd.isNotEmpty
+                            ? TimeOfDay(hour: int.parse(_shiftEnd.split(':')[0]), minute: int.parse(_shiftEnd.split(':')[1]))
+                            : now,
+                        );
+                        if (picked != null) {
+                          setModalState(() {
+                            _shiftEnd = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: BaycelColors.card,
+                          borderRadius: BorderRadius.circular(BaycelRadius.md),
+                          border: Border.all(color: BaycelColors.divider),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.stop_rounded, size: 16, color: BaycelColors.error),
+                            SizedBox(width: BaycelSpacing.xs),
+                            Expanded(
+                              child: Text(
+                                _shiftEnd.isEmpty ? 'End' : _shiftEnd,
+                                style: BaycelTypography.body.copyWith(
+                                  fontSize: 13,
+                                  color: _shiftEnd.isEmpty ? BaycelColors.textDisabled : BaycelColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
-                onChanged: (v) => setModalState(() => _selectedShift = v ?? _selectedShift),
               ),
               SizedBox(height: BaycelSpacing.md),
               buildFieldLabel('Register'),
@@ -220,17 +501,94 @@ class _SalesCounterCardState extends State<_SalesCounterCard> {
                 ),
               ],
               SizedBox(height: BaycelSpacing.md),
+              buildFieldLabel('Receipt Photo *'),
+              SizedBox(height: 5),
+              GestureDetector(
+                onTap: _pickReceiptImage,
+                child: Container(
+                  height: _receiptImage != null ? 200 : 120,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: BaycelColors.surface,
+                    borderRadius: BorderRadius.circular(BaycelRadius.md),
+                    border: Border.all(
+                      color: _receiptImage != null ? BaycelColors.success : BaycelColors.divider,
+                      width: _receiptImage != null ? 2 : 1,
+                    ),
+                  ),
+                  child: _receiptImage != null
+                    ? Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(BaycelRadius.md),
+                            child: Image.file(_receiptImage!, fit: BoxFit.cover),
+                          ),
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: GestureDetector(
+                              onTap: () => setModalState(() => _receiptImage = null),
+                              child: Container(
+                                padding: EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: BaycelColors.error,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(Icons.close, size: 16, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: BaycelColors.crimson.withValues(alpha: 0.08),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(Icons.camera_alt_outlined, size: 24, color: BaycelColors.crimson),
+                          ),
+                          SizedBox(height: BaycelSpacing.sm),
+                          Text('Upload receipt photo', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary, fontWeight: FontWeight.w500, fontSize: 12.5)),
+                          SizedBox(height: BaycelSpacing.xxs),
+                          Text('Required — tap to take a photo or choose from gallery', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textDisabled, fontSize: 10)),
+                        ],
+                      ),
+                ),
+              ),
+              SizedBox(height: BaycelSpacing.md),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
+                    if (_receiptImage == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Please upload a receipt photo before submitting'), backgroundColor: BaycelColors.error),
+                      );
+                      return;
+                    }
+                    if (_shiftStart.isEmpty || _shiftEnd.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Please select both shift start and end times'), backgroundColor: BaycelColors.error),
+                      );
+                      return;
+                    }
                     final amount = double.tryParse(_salesController.text) ?? 0;
                     final expectedCash = double.tryParse(_expectedCashController.text) ?? 0;
                     final actualCash = double.tryParse(_actualCashController.text) ?? 0;
-                    widget.onSubmit(amount, expectedCash, actualCash, _selectedShift, _selectedRegister);
+                    widget.onSubmit(amount, expectedCash, actualCash, '$_shiftStart–$_shiftEnd', _selectedRegister, _receiptImage!);
                     _salesController.clear();
                     _expectedCashController.clear();
                     _actualCashController.clear();
+                    setState(() {
+                      _receiptImage = null;
+                      _shiftStart = '';
+                      _shiftEnd = '';
+                    });
                   },
                   style: BaycelComponents.buttonPrimary.copyWith(
                     padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: BaycelSpacing.buttonHorizontal, vertical: BaycelSpacing.buttonVertical)),
@@ -242,6 +600,36 @@ class _SalesCounterCardState extends State<_SalesCounterCard> {
           ),
         );
       },
+    );
+  }
+
+  void _pickReceiptImage() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: Icon(Icons.camera_alt),
+              title: Text('Take Photo'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final picked = await _imagePicker.pickImage(source: ImageSource.camera, imageQuality: 80);
+                if (picked != null) setState(() => _receiptImage = File(picked.path));
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.photo_library),
+              title: Text('Choose from Gallery'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final picked = await _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+                if (picked != null) setState(() => _receiptImage = File(picked.path));
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

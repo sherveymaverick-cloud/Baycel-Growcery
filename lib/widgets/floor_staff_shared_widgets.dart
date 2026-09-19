@@ -87,18 +87,37 @@ class ClockCard extends StatelessWidget {
                     style: BaycelTypography.label.copyWith(color: BaycelColors.crimson, fontSize: 12.5)),
                 )
               else if (isOnBreak)
-                ElevatedButton(
-                  onPressed: onToggleBreak,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: BaycelColors.crimson,
-                    padding: EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(BaycelRadius.md),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ElevatedButton(
+                      onPressed: onToggleBreak,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: BaycelColors.crimson,
+                        padding: EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(BaycelRadius.md),
+                        ),
+                      ),
+                      child: Text('End Break',
+                        style: BaycelTypography.label.copyWith(color: BaycelColors.crimson, fontSize: 12.5)),
                     ),
-                  ),
-                  child: Text('End Break',
-                    style: BaycelTypography.label.copyWith(color: BaycelColors.crimson, fontSize: 12.5)),
+                    SizedBox(width: 6),
+                    ElevatedButton(
+                      onPressed: onToggleClockIn,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white.withValues(alpha: 0.2),
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(BaycelRadius.md),
+                        ),
+                      ),
+                      child: Text('Time Out',
+                        style: BaycelTypography.label.copyWith(color: Colors.white, fontSize: 12)),
+                    ),
+                  ],
                 )
               else
                 Row(
@@ -170,13 +189,22 @@ class _CashAdvanceCardState extends State<CashAdvanceCard> {
   }
 
   void _submit() {
-    final amount = _amountController.text;
+    final amountText = _amountController.text;
     final reason = _reasonController.text;
-    if (amount.isEmpty || reason.isEmpty) {
+    if (amountText.isEmpty || reason.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Enter valid amount and reason')));
       return;
     }
-    widget.onSubmit(amount, reason);
+    final amount = double.tryParse(amountText) ?? 0;
+    if (amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Amount must be greater than 0')));
+      return;
+    }
+    if (amount > 10000) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Maximum cash advance is ₱10,000')));
+      return;
+    }
+    widget.onSubmit(amountText, reason);
     _amountController.clear();
     _reasonController.clear();
   }
@@ -514,12 +542,24 @@ class _StockOutCardState extends State<StockOutCard> {
               SizedBox(height: BaycelSpacing.md),
               buildFieldLabel('Product'),
               SizedBox(height: 5),
-              DropdownButtonFormField<String>(
-                initialValue: products.any((p) => p.name == _selectedProduct) ? _selectedProduct : null,
-                decoration: BaycelComponents.input.copyWith(filled: true, fillColor: BaycelColors.card),
-                style: BaycelTypography.body.copyWith(fontSize: 13),
-                items: products.map((p) => DropdownMenuItem(value: p.name, child: Text(p.name))).toList(),
-                onChanged: (v) => setState(() => _selectedProduct = v ?? ''),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base),
+                decoration: BoxDecoration(
+                  color: BaycelColors.card,
+                  border: Border.all(color: BaycelColors.divider),
+                  borderRadius: BorderRadius.circular(BaycelRadius.md),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedProduct.isNotEmpty && products.any((p) => p.name == _selectedProduct) ? _selectedProduct : null,
+                    isExpanded: true,
+                    style: BaycelTypography.body.copyWith(fontSize: 13),
+                    dropdownColor: BaycelColors.card,
+                    hint: Text('Select product', style: BaycelTypography.body.copyWith(fontSize: 13, color: BaycelColors.textDisabled)),
+                    items: products.map((p) => DropdownMenuItem(value: p.name, child: Text(p.name))).toList(),
+                    onChanged: (v) => setState(() => _selectedProduct = v ?? ''),
+                  ),
+                ),
               ),
               SizedBox(height: BaycelSpacing.md),
               Row(

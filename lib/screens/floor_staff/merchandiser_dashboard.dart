@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../theme.dart';
 import '../../widgets/shared_widgets.dart';
 import '../../widgets/floor_staff_helpers.dart';
@@ -7,6 +8,7 @@ import '../../services/firestore_service.dart';
 import '../../models/product.dart';
 import '../../models/stock_movement.dart';
 import '../../models/user.dart';
+import '../../models/cash_advance.dart';
 
 class MerchandiserDashboard extends StatelessWidget {
   final FirestoreService firestore;
@@ -14,6 +16,7 @@ class MerchandiserDashboard extends StatelessWidget {
   final Stream<List<Product>> productsStream;
   final Stream<List<StockMovement>> stockMovementsStream;
   final void Function(String productName, int quantity) onStockOut;
+  final Stream<List<CashAdvance>> cashAdvancesStream;
 
   const MerchandiserDashboard({
     super.key,
@@ -22,6 +25,7 @@ class MerchandiserDashboard extends StatelessWidget {
     required this.productsStream,
     required this.stockMovementsStream,
     required this.onStockOut,
+    required this.cashAdvancesStream,
   });
 
   @override
@@ -47,6 +51,29 @@ class MerchandiserDashboard extends StatelessWidget {
         ),
         SizedBox(height: BaycelSpacing.md),
         _StockMovementsCard(stockMovementsStream: stockMovementsStream),
+        SizedBox(height: BaycelSpacing.md),
+        CashAdvanceCard(onSubmit: (amount, reason) async {
+          try {
+            final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+            await firestore.addCashAdvance(CashAdvance(
+              id: '',
+              employeeId: uid,
+              employeeName: currentUser?.name ?? '',
+              amount: double.tryParse(amount) ?? 0,
+              reason: reason,
+              requestedAt: DateTime.now(),
+            ));
+            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Cash advance request submitted')));
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Unable to submit request. Please try again.'), backgroundColor: BaycelColors.error),
+              );
+            }
+          }
+        }),
+        SizedBox(height: BaycelSpacing.md),
+        MyRequestsCard(requestsStream: cashAdvancesStream),
       ],
     );
   }

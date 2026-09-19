@@ -48,6 +48,7 @@ class StockMovement {
   final DateTime createdAt;
   final double? expectedCash;
   final double? actualCash;
+  final String? receiptImageUrl;
 
   const StockMovement({
     required this.id,
@@ -62,6 +63,7 @@ class StockMovement {
     required this.createdAt,
     this.expectedCash,
     this.actualCash,
+    this.receiptImageUrl,
   });
 
   Map<String, dynamic> toMap() {
@@ -77,6 +79,7 @@ class StockMovement {
       'createdAt': createdAt,
       if (expectedCash != null) 'expectedCash': expectedCash,
       if (actualCash != null) 'actualCash': actualCash,
+      if (receiptImageUrl != null) 'receiptImageUrl': receiptImageUrl,
     };
   }
 
@@ -94,6 +97,7 @@ class StockMovement {
       createdAt: _toDate(map['createdAt']) ?? DateTime.now(),
       expectedCash: (map['expectedCash'] as num?)?.toDouble(),
       actualCash: (map['actualCash'] as num?)?.toDouble(),
+      receiptImageUrl: map['receiptImageUrl'],
     );
   }
 

@@ -181,6 +181,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildSystemTogglesCard() {
     final toggles = _settings?.values ?? {};
+    final lowStockRoles = List<String>.from(toggles['lowStockAlertRoles'] ?? ['owner', 'manager', 'bodegero', 'delivery_checker', 'merchandiser']);
+    
     return Container(
       decoration: BaycelComponents.card,
       child: Padding(
@@ -207,6 +209,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _saveSettings();
               },
             ),
+            if (toggles['lowStockAlerts'] ?? true) ...[
+              SizedBox(height: BaycelSpacing.sm),
+              Padding(
+                padding: EdgeInsets.only(left: BaycelSpacing.base),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Alert Recipients', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
+                    SizedBox(height: BaycelSpacing.sm),
+                    _buildRoleCheckbox('Owner', 'owner', lowStockRoles, toggles),
+                    _buildRoleCheckbox('Manager', 'manager', lowStockRoles, toggles),
+                    _buildRoleCheckbox('Bodegero', 'bodegero', lowStockRoles, toggles),
+                    _buildRoleCheckbox('Delivery Checker', 'delivery_checker', lowStockRoles, toggles),
+                    _buildRoleCheckbox('Merchandiser', 'merchandiser', lowStockRoles, toggles),
+                  ],
+                ),
+              ),
+            ],
             _buildToggleRow(
               title: 'Attendance Notifications',
               description: 'Alert on tardiness and absences',
@@ -230,6 +250,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
               showBorder: false,
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRoleCheckbox(String label, String roleKey, List<String> selectedRoles, Map<String, dynamic> toggles) {
+    final isSelected = selectedRoles.contains(roleKey);
+    return InkWell(
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            selectedRoles.remove(roleKey);
+          } else {
+            selectedRoles.add(roleKey);
+          }
+          toggles['lowStockAlertRoles'] = selectedRoles;
+        });
+        _saveSettings();
+      },
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Icon(
+              isSelected ? Icons.check_box : Icons.check_box_outline_blank,
+              size: 18,
+              color: isSelected ? BaycelColors.crimson : BaycelColors.textDisabled,
+            ),
+            SizedBox(width: BaycelSpacing.sm),
+            Text(label, style: BaycelTypography.body.copyWith(fontSize: 13)),
           ],
         ),
       ),

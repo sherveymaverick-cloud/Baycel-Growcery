@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:io';
 import '../theme.dart';
 import '../widgets/animated_widgets.dart';
 import '../widgets/floor_staff_shared_widgets.dart';
@@ -115,21 +116,28 @@ class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
         }
       } else {
         if (_todayAttendanceId.isNotEmpty) {
-          final timeInParts = _clockTime.replaceFirst('Since ', '').split(':');
+          final today = await _firestore.getTodaysAttendance(uid);
+          final timeInStr = today?.timeIn ?? _clockTime.replaceFirst('Since ', '');
+          final timeInParts = timeInStr.split(':');
           final timeOutParts = timeStr.split(':');
           final inMinutes = int.parse(timeInParts[0]) * 60 + int.parse(timeInParts[1]);
           final outMinutes = int.parse(timeOutParts[0]) * 60 + int.parse(timeOutParts[1]);
           final totalHours = (outMinutes - inMinutes) / 60.0;
 
-          await _firestore.updateAttendance(_todayAttendanceId, {
+          final updateData = <String, dynamic>{
             'timeOut': timeStr,
             'totalHours': totalHours,
             'status': 'complete',
-          });
+          };
+          if (_isOnBreak && today != null && (today.timeIn2 == null || today.timeIn2!.isEmpty)) {
+            updateData['timeIn2'] = timeStr;
+          }
+          await _firestore.updateAttendance(_todayAttendanceId, updateData);
         }
         if (mounted) {
           setState(() {
             _isClockedIn = false;
+            _isOnBreak = false;
             _todayAttendanceId = '';
             _clockTime = '';
           });
@@ -177,7 +185,7 @@ class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
     }
   }
 
-  void _handleSalesSubmission(double amount, double expectedCash, double actualCash, String shift, String register) async {
+  void _handleSalesSubmission(double amount, double expectedCash, double actualCash, String shift, String register, File receiptImage) async {
     try {
       if (amount <= 0) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Enter a valid amount')));
@@ -409,25 +417,6 @@ class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
               Icon(Icons.shopping_cart_outlined, color: Colors.white, size: 18),
               SizedBox(width: BaycelSpacing.sm),
               Text('Baycel Growcery', style: BaycelTypography.label.copyWith(color: Colors.white, fontSize: 13)),
-              Spacer(),
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 32, height: 32,
-                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), shape: BoxShape.circle),
-                    child: Icon(Icons.notifications_outlined, color: Colors.white, size: 15),
-                  ),
-                  Positioned(
-                    top: 0, right: 0,
-                    child: Container(
-                      width: 6, height: 6,
-                      decoration: BoxDecoration(color: BaycelColors.marigold, shape: BoxShape.circle,
-                        border: Border.all(color: BaycelColors.crimsonDark, width: 1.5)),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
           SizedBox(height: BaycelSpacing.lg),
@@ -446,6 +435,7 @@ class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
           firestore: _firestore,
           staffName: _staffName,
           onSubmitSales: _handleSalesSubmission,
+          onSubmitAbsence: _handleAbsenceSubmission,
           cashAdvancesStream: _firestore.getCashAdvancesByUser(FirebaseAuth.instance.currentUser?.uid ?? ''),
           attendanceStream: _firestore.getAttendance(),
         ),
@@ -462,9 +452,12 @@ class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
       case 'bodegero': return [
         BodegeroDashboard(
           firestore: _firestore,
+          staffName: _staffName,
+          onSubmitAbsence: _handleAbsenceSubmission,
           deliveriesStream: _firestore.getDeliveries(),
           stockMovementsStream: _firestore.getStockMovements(),
           productsStream: _firestore.getProducts(),
+          cashAdvancesStream: _firestore.getCashAdvancesByUser(FirebaseAuth.instance.currentUser?.uid ?? ''),
           onConfirmDelivery: _handleConfirmDelivery,
           onStockOut: _handleStockOut,
         ),
@@ -472,8 +465,11 @@ class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
       case 'delivery_checker': return [
         DeliveryCheckerDashboard(
           firestore: _firestore,
+          staffName: _staffName,
+          onSubmitAbsence: _handleAbsenceSubmission,
           deliveriesStream: _firestore.getDeliveries(),
           productsStream: _firestore.getProducts(),
+          cashAdvancesStream: _firestore.getCashAdvancesByUser(FirebaseAuth.instance.currentUser?.uid ?? ''),
           onCreateDelivery: _handleDeliveryCreation,
         ),
       ];
@@ -484,6 +480,7 @@ class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
           productsStream: _firestore.getProducts(),
           stockMovementsStream: _firestore.getStockMovements(),
           onStockOut: _handleStockOut,
+          cashAdvancesStream: _firestore.getCashAdvancesByUser(FirebaseAuth.instance.currentUser?.uid ?? ''),
         ),
       ];
       default: return [
@@ -491,6 +488,7 @@ class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
           firestore: _firestore,
           staffName: _staffName,
           onSubmitSales: _handleSalesSubmission,
+          onSubmitAbsence: _handleAbsenceSubmission,
           cashAdvancesStream: _firestore.getCashAdvancesByUser(FirebaseAuth.instance.currentUser?.uid ?? ''),
           attendanceStream: _firestore.getAttendance(),
         ),

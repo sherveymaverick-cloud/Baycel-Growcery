@@ -17,6 +17,7 @@ class EmployeeScreen extends StatefulWidget {
 class _EmployeeScreenState extends State<EmployeeScreen> {
   UserRole? _selectedRole;
   UserRole? _currentUserRole;
+  String? _currentUserId;
 
   static const _filterRoles = <UserRole?>[
     null,
@@ -93,7 +94,10 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
   void _loadCurrentUser() async {
     final user = await _firestore.getCurrentUser();
     if (user != null && mounted) {
-      setState(() => _currentUserRole = user.role);
+      setState(() {
+        _currentUserRole = user.role;
+        _currentUserId = user.uid;
+      });
     }
   }
 
@@ -111,9 +115,22 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
         }
 
         final allUsers = snapshot.data ?? [];
-        final filtered = _selectedRole == null
-            ? allUsers
-            : allUsers.where((u) => u.role == _selectedRole).toList();
+
+        List<StoreUser> filtered;
+        if (_currentUserRole == UserRole.owner) {
+          filtered = allUsers.where((u) => u.role != UserRole.owner).toList();
+        } else if (_currentUserRole == UserRole.manager) {
+          filtered = allUsers.where((u) =>
+            u.uid == _currentUserId ||
+            (u.role != UserRole.owner && u.role != UserRole.manager)
+          ).toList();
+        } else {
+          filtered = allUsers.where((u) => u.role != UserRole.owner).toList();
+        }
+
+        if (_selectedRole != null) {
+          filtered = filtered.where((u) => u.role == _selectedRole).toList();
+        }
 
         return SingleChildScrollView(
           padding: EdgeInsets.all(BaycelSpacing.lg),
@@ -148,7 +165,19 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
     return StreamBuilder<List<StoreUser>>(
       stream: _usersStream(),
       builder: (context, snapshot) {
-        final count = snapshot.data?.length ?? 0;
+        final allUsers = snapshot.data ?? [];
+        int count;
+        if (_currentUserRole == UserRole.owner) {
+          count = allUsers.where((u) => u.role != UserRole.owner).length;
+        } else if (_currentUserRole == UserRole.manager) {
+          count = allUsers.where((u) =>
+            u.uid == _currentUserId ||
+            (u.role != UserRole.owner && u.role != UserRole.manager)
+          ).length;
+        } else {
+          count = allUsers.where((u) => u.role != UserRole.owner).length;
+        }
+        final canAdd = _currentUserRole == UserRole.owner || _currentUserRole == UserRole.manager;
         return Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -157,16 +186,17 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
               children: [
                 Text('Employees', style: BaycelTypography.display),
                 SizedBox(height: BaycelSpacing.xxs),
-                Text('$count team members across 7 roles',
+                Text('$count team members',
                   style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary, fontSize: 12.5)),
               ],
             ),
-            ElevatedButton.icon(
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
-              icon: const Icon(Icons.person_add, size: 18),
-              label: const Text('Add Employee'),
-              style: BaycelComponents.buttonPrimary,
-            ),
+            if (canAdd)
+              ElevatedButton.icon(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
+                icon: const Icon(Icons.person_add, size: 18),
+                label: const Text('Add Employee'),
+                style: BaycelComponents.buttonPrimary,
+              ),
           ],
         );
       },
@@ -227,16 +257,25 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
         childAspectRatio: 2.8,
       ),
       itemCount: users.length,
-      itemBuilder: (context, index) => StaggeredItem(
-        index: index,
-        child: _EmployeeCard(
-          user: users[index],
-          roleColor: _roleColor(users[index].role),
-          roleLabel: _roleLabel(users[index].role),
-          initials: _initials(users[index].name),
-          canEdit: _currentUserRole == UserRole.owner || _currentUserRole == UserRole.manager,
-        ),
-      ),
+      itemBuilder: (context, index) {
+        final user = users[index];
+        bool canEdit = false;
+        if (_currentUserRole == UserRole.owner) {
+          canEdit = user.role != UserRole.owner;
+        } else if (_currentUserRole == UserRole.manager) {
+          canEdit = user.uid != _currentUserId && user.role != UserRole.owner && user.role != UserRole.manager;
+        }
+        return StaggeredItem(
+          index: index,
+          child: _EmployeeCard(
+            user: user,
+            roleColor: _roleColor(user.role),
+            roleLabel: _roleLabel(user.role),
+            initials: _initials(user.name),
+            canEdit: canEdit,
+          ),
+        );
+      },
     );
   }
 }
@@ -325,11 +364,12 @@ class _EmployeeCard extends StatelessWidget {
     final nameController = TextEditingController(text: user.name);
     final emailController = TextEditingController(text: user.email);
     final rateController = TextEditingController(text: user.rate > 0 ? user.rate.toStringAsFixed(0) : '');
-    int selectedPayday = user.payday;
-    UserRole selectedRole = user.role;
+    int selectedPayday = (user.payday == 7 || user.payday == 15) ? user.payday : 7;
+    UserRole selectedRole = [UserRole.manager, UserRole.cashier, UserRole.bagger, UserRole.bodegero, UserRole.deliveryChecker, UserRole.merchandiser].contains(user.role) ? user.role : UserRole.cashier;
     String scheduleStart = user.schedule.start;
     String scheduleEnd = user.schedule.end;
     final firestore = FirestoreService();
+    final formKey = GlobalKey<FormState>();
 
     InputDecoration _fieldDeco(String hint) => BaycelComponents.input.copyWith(
       hintText: hint,
@@ -349,6 +389,37 @@ class _EmployeeCard extends StatelessWidget {
         color: BaycelColors.textMuted, fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.05)),
     );
 
+    TimeOfDay _parseTime(String s) {
+      final parts = s.split(':');
+      return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+    }
+
+    String _formatTime(TimeOfDay t) =>
+        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+    Widget _timePickerButton(BuildContext ctx, StateSetter setDialogState, String time, ValueChanged<String> onPicked) {
+      return GestureDetector(
+        onTap: () async {
+          final current = _parseTime(time);
+          final picked = await showTimePicker(context: ctx, initialTime: current);
+          if (picked != null) {
+            setDialogState(() => onPicked(_formatTime(picked)));
+          }
+        },
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: BaycelSpacing.md),
+          decoration: BoxDecoration(color: BaycelColors.card, border: Border.all(color: BaycelColors.divider), borderRadius: BorderRadius.circular(BaycelRadius.md)),
+          child: Row(
+            children: [
+              Icon(Icons.access_time, size: 18, color: BaycelColors.textDisabled),
+              SizedBox(width: BaycelSpacing.sm),
+              Text(time, style: BaycelTypography.body.copyWith(fontSize: 13)),
+            ],
+          ),
+        ),
+      );
+    }
+
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -357,118 +428,102 @@ class _EmployeeCard extends StatelessWidget {
           content: SizedBox(
             width: 360,
             child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _sectionTitle('Account'),
-                  _label('Name'),
-                  TextField(controller: nameController, style: BaycelTypography.body.copyWith(fontSize: 13), decoration: _fieldDeco('Full name')),
-                  SizedBox(height: BaycelSpacing.sm),
-                  _label('Email'),
-                  TextField(controller: emailController, style: BaycelTypography.body.copyWith(fontSize: 13), decoration: _fieldDeco('Email address'), keyboardType: TextInputType.emailAddress),
-                  SizedBox(height: BaycelSpacing.sm),
-                  _label('Role'),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base),
-                    decoration: BoxDecoration(color: BaycelColors.card, border: Border.all(color: BaycelColors.divider), borderRadius: BorderRadius.circular(BaycelRadius.md)),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<UserRole>(
-                        value: selectedRole,
-                        isExpanded: true,
-                        style: BaycelTypography.body.copyWith(fontSize: 13),
-                        dropdownColor: BaycelColors.card,
-                        items: const [
-                          DropdownMenuItem(value: UserRole.manager, child: Text('Manager')),
-                          DropdownMenuItem(value: UserRole.cashier, child: Text('Cashier')),
-                          DropdownMenuItem(value: UserRole.bagger, child: Text('Bagger')),
-                          DropdownMenuItem(value: UserRole.bodegero, child: Text('Bodegero')),
-                          DropdownMenuItem(value: UserRole.deliveryChecker, child: Text('Delivery Checker')),
-                          DropdownMenuItem(value: UserRole.merchandiser, child: Text('Merchandiser')),
-                        ],
-                        onChanged: (v) => setDialogState(() { if (v != null) selectedRole = v; }),
-                      ),
-                    ),
-                  ),
-                  _sectionTitle('Employment'),
-                  _label('Hourly Rate (₱)'),
-                  TextField(controller: rateController, style: BaycelTypography.body.copyWith(fontSize: 13), decoration: _fieldDeco('e.g. 75'), keyboardType: TextInputType.number),
-                  SizedBox(height: BaycelSpacing.sm),
-                  _label('Payday'),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base),
-                    decoration: BoxDecoration(color: BaycelColors.card, border: Border.all(color: BaycelColors.divider), borderRadius: BorderRadius.circular(BaycelRadius.md)),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<int>(
-                        value: selectedPayday,
-                        isExpanded: true,
-                        style: BaycelTypography.body.copyWith(fontSize: 13),
-                        dropdownColor: BaycelColors.card,
-                        items: const [
-                          DropdownMenuItem(value: 15, child: Text('Every 15th')),
-                          DropdownMenuItem(value: 30, child: Text('Every 30th (End of month)')),
-                        ],
-                        onChanged: (v) => setDialogState(() => selectedPayday = v ?? 15),
-                      ),
-                    ),
-                  ),
-                  _sectionTitle('Schedule'),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _label('Start'),
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base),
-                              decoration: BoxDecoration(color: BaycelColors.card, border: Border.all(color: BaycelColors.divider), borderRadius: BorderRadius.circular(BaycelRadius.md)),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value: scheduleStart,
-                                  isExpanded: true,
-                                  style: BaycelTypography.body.copyWith(fontSize: 13),
-                                  dropdownColor: BaycelColors.card,
-                                  items: List.generate(24, (i) => DropdownMenuItem(
-                                    value: '${i.toString().padLeft(2, '0')}:00',
-                                    child: Text('${i.toString().padLeft(2, '0')}:00'),
-                                  )),
-                                  onChanged: (v) => setDialogState(() => scheduleStart = v ?? scheduleStart),
-                                ),
-                              ),
-                            ),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _sectionTitle('Account'),
+                    _label('Name'),
+                    TextField(controller: nameController, style: BaycelTypography.body.copyWith(fontSize: 13), decoration: _fieldDeco('Full name')),
+                    SizedBox(height: BaycelSpacing.sm),
+                    _label('Email'),
+                    TextField(controller: emailController, style: BaycelTypography.body.copyWith(fontSize: 13), decoration: _fieldDeco('Email address'), keyboardType: TextInputType.emailAddress),
+                    SizedBox(height: BaycelSpacing.sm),
+                    _label('Role'),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base),
+                      decoration: BoxDecoration(color: BaycelColors.card, border: Border.all(color: BaycelColors.divider), borderRadius: BorderRadius.circular(BaycelRadius.md)),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<UserRole>(
+                          value: selectedRole,
+                          isExpanded: true,
+                          style: BaycelTypography.body.copyWith(fontSize: 13),
+                          dropdownColor: BaycelColors.card,
+                          items: const [
+                            DropdownMenuItem(value: UserRole.manager, child: Text('Manager')),
+                            DropdownMenuItem(value: UserRole.cashier, child: Text('Cashier')),
+                            DropdownMenuItem(value: UserRole.bagger, child: Text('Bagger')),
+                            DropdownMenuItem(value: UserRole.bodegero, child: Text('Bodegero')),
+                            DropdownMenuItem(value: UserRole.deliveryChecker, child: Text('Delivery Checker')),
+                            DropdownMenuItem(value: UserRole.merchandiser, child: Text('Merchandiser')),
                           ],
+                          onChanged: (v) => setDialogState(() { if (v != null) selectedRole = v; }),
                         ),
                       ),
-                      SizedBox(width: BaycelSpacing.sm),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _label('End'),
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base),
-                              decoration: BoxDecoration(color: BaycelColors.card, border: Border.all(color: BaycelColors.divider), borderRadius: BorderRadius.circular(BaycelRadius.md)),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value: scheduleEnd,
-                                  isExpanded: true,
-                                  style: BaycelTypography.body.copyWith(fontSize: 13),
-                                  dropdownColor: BaycelColors.card,
-                                  items: List.generate(24, (i) => DropdownMenuItem(
-                                    value: '${i.toString().padLeft(2, '0')}:00',
-                                    child: Text('${i.toString().padLeft(2, '0')}:00'),
-                                  )),
-                                  onChanged: (v) => setDialogState(() => scheduleEnd = v ?? scheduleEnd),
-                                ),
-                              ),
-                            ),
+                    ),
+                    _sectionTitle('Employment'),
+                    _label('Hourly Rate (₱)'),
+                    TextFormField(
+                      controller: rateController,
+                      style: BaycelTypography.body.copyWith(fontSize: 13),
+                      decoration: _fieldDeco('e.g. 75'),
+                      keyboardType: TextInputType.number,
+                      onChanged: (v) => setDialogState(() {}),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return null;
+                        final rate = double.tryParse(v);
+                        if (rate == null) return 'Enter a valid number';
+                        if (rate > 1000) return 'Max ₱1,000/hr lang po';
+                        return null;
+                      },
+                    ),
+                    SizedBox(height: BaycelSpacing.sm),
+                    _label('Payday'),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base),
+                      decoration: BoxDecoration(color: BaycelColors.card, border: Border.all(color: BaycelColors.divider), borderRadius: BorderRadius.circular(BaycelRadius.md)),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<int>(
+                          value: selectedPayday,
+                          isExpanded: true,
+                          style: BaycelTypography.body.copyWith(fontSize: 13),
+                          dropdownColor: BaycelColors.card,
+                          items: const [
+                            DropdownMenuItem(value: 7, child: Text('Every 7th')),
+                            DropdownMenuItem(value: 15, child: Text('Every 15th')),
                           ],
+                          onChanged: (v) => setDialogState(() => selectedPayday = v ?? 7),
                         ),
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                    _sectionTitle('Schedule'),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _label('Start'),
+                              _timePickerButton(ctx, setDialogState, scheduleStart, (t) => scheduleStart = t),
+                            ],
+                          ),
+                        ),
+                        SizedBox(width: BaycelSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _label('End'),
+                              _timePickerButton(ctx, setDialogState, scheduleEnd, (t) => scheduleEnd = t),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -516,12 +571,14 @@ class _EmployeeCard extends StatelessWidget {
             ),
             ElevatedButton(
               onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                final rate = double.tryParse(rateController.text) ?? 0;
                 try {
                   await firestore.updateUser(user.uid, {
                     'name': nameController.text.trim(),
                     'email': emailController.text.trim(),
                     'role': selectedRole.value,
-                    'rate': double.tryParse(rateController.text) ?? 0,
+                    'rate': rate,
                     'payday': selectedPayday,
                     'schedule': {'start': scheduleStart, 'end': scheduleEnd},
                   });

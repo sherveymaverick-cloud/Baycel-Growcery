@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
+import 'services/notification_service.dart';
 import 'theme.dart';
 import 'widgets/shared_widgets.dart';
 import 'screens/login_screen.dart';
@@ -13,6 +14,8 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  setupBackgroundMessaging();
+  await NotificationService().initialize();
   runApp(const MyApp());
 }
 

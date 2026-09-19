@@ -7,7 +7,9 @@ import '../services/firestore_service.dart';
 import '../models/user.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final StoreUser? targetUser;
+
+  const ProfileScreen({super.key, this.targetUser});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -17,24 +19,84 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _firestore = FirestoreService();
   StoreUser? _user;
   bool _isLoading = true;
+  bool _isEditing = false;
+  late TextEditingController _nameController;
+  late TextEditingController _emailController;
 
   @override
   void initState() {
     super.initState();
+    _nameController = TextEditingController();
+    _emailController = TextEditingController();
     _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    super.dispose();
   }
 
   void _loadProfile() async {
     try {
-      final user = await _firestore.getCurrentUser();
-      if (user != null && mounted) {
+      if (widget.targetUser != null) {
+        _user = widget.targetUser;
+      } else {
+        _user = await _firestore.getCurrentUser();
+      }
+      if (_user != null && mounted) {
         setState(() {
-          _user = user;
+          _nameController.text = _user!.name;
+          _emailController.text = _user!.email;
           _isLoading = false;
         });
       }
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  bool _canEdit() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return false;
+    if (widget.targetUser == null) return true;
+    if (_user?.role == UserRole.owner) return false;
+    return true;
+  }
+
+  void _saveProfile() async {
+    if (_user == null) return;
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Name cannot be empty')));
+      return;
+    }
+    try {
+      await _firestore.updateUser(_user!.uid, {'name': name, 'updatedAt': DateTime.now()});
+      setState(() {
+        _user = StoreUser(
+          uid: _user!.uid,
+          name: name,
+          email: _user!.email,
+          role: _user!.role,
+          rate: _user!.rate,
+          payday: _user!.payday,
+          schedule: _user!.schedule,
+          rfidCardUID: _user!.rfidCardUID,
+          assignedProducts: _user!.assignedProducts,
+          createdAt: _user!.createdAt,
+          updatedAt: DateTime.now(),
+        );
+        _isEditing = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Profile updated')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 
@@ -67,7 +129,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           StaggeredItem(
             index: 0,
-            child: Text('My Profile', style: BaycelTypography.display),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('My Profile', style: BaycelTypography.display),
+                if (_canEdit())
+                  IconButton(
+                    onPressed: () {
+                      setState(() => _isEditing = !_isEditing);
+                      if (!_isEditing) {
+                        _nameController.text = _user?.name ?? '';
+                      }
+                    },
+                    icon: Icon(_isEditing ? Icons.close : Icons.edit_outlined, color: BaycelColors.crimson),
+                  ),
+              ],
+            ),
           ),
           SizedBox(height: BaycelSpacing.lg),
           StaggeredItem(index: 1, child: _buildProfileHeader(user, firebaseUser)),
@@ -125,6 +202,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildInfoCard(StoreUser? user, User? firebaseUser) {
+    final isOwner = user?.role == UserRole.owner;
+    final canEdit = _canEdit();
+
     return Container(
       padding: EdgeInsets.all(BaycelSpacing.base),
       decoration: BaycelComponents.card,
@@ -135,11 +215,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
           SizedBox(height: BaycelSpacing.md),
           _buildInfoRow(Icons.email_outlined, 'Email', firebaseUser?.email ?? '—'),
           Divider(color: BaycelColors.divider.withValues(alpha: 0.5)),
-          _buildInfoRow(Icons.person_outline, 'Full Name', user?.name ?? '—'),
+          _isEditing && canEdit
+            ? _buildEditableRow(Icons.person_outline, 'Full Name', _nameController)
+            : _buildInfoRow(Icons.person_outline, 'Full Name', user?.name ?? '—'),
           Divider(color: BaycelColors.divider.withValues(alpha: 0.5)),
           _buildInfoRow(Icons.badge_outlined, 'Role', _getRoleLabel(user?.role.value ?? 'cashier')),
-          Divider(color: BaycelColors.divider.withValues(alpha: 0.5)),
-          _buildInfoRow(Icons.payments_outlined, 'Hourly Rate', '\u20B1${(user?.rate ?? 0).toStringAsFixed(0)}/hr'),
+          if (isOwner) ...[
+            Divider(color: BaycelColors.divider.withValues(alpha: 0.5)),
+            _buildInfoRow(Icons.payments_outlined, 'Hourly Rate', '\u20B1${(user?.rate ?? 0).toStringAsFixed(0)}/hr'),
+          ],
+          if (_isEditing && canEdit) ...[
+            SizedBox(height: BaycelSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _saveProfile,
+                style: BaycelComponents.buttonPrimary,
+                child: Text('Save Changes', style: TextStyle(color: Colors.white)),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -178,6 +273,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(label, style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
                 SizedBox(height: 2),
                 Text(value, style: BaycelTypography.body.copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditableRow(IconData icon, String label, TextEditingController controller) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: BaycelSpacing.sm),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: BaycelColors.textSecondary),
+          SizedBox(width: BaycelSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
+                SizedBox(height: 2),
+                TextField(
+                  controller: controller,
+                  style: BaycelTypography.body.copyWith(fontWeight: FontWeight.w600, fontSize: 13),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(BaycelRadius.md),
+                      borderSide: BorderSide(color: BaycelColors.divider),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(BaycelRadius.md),
+                      borderSide: BorderSide(color: BaycelColors.crimson),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

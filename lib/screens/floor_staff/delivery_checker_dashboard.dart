@@ -8,19 +8,27 @@ import '../../widgets/floor_staff_shared_widgets.dart';
 import '../../services/firestore_service.dart';
 import '../../models/product.dart';
 import '../../models/delivery.dart';
+import '../../models/absence_form.dart';
+import '../../models/cash_advance.dart';
 import 'delivery_scanner_screen.dart';
 
 class DeliveryCheckerDashboard extends StatefulWidget {
   final FirestoreService firestore;
+  final String staffName;
+  final void Function(DateTime startDate, DateTime endDate, String reason) onSubmitAbsence;
   final Stream<List<Delivery>> deliveriesStream;
   final Stream<List<Product>> productsStream;
+  final Stream<List<CashAdvance>> cashAdvancesStream;
   final void Function(String supplier, List<Map<String, String>> items) onCreateDelivery;
 
   const DeliveryCheckerDashboard({
     super.key,
     required this.firestore,
+    required this.staffName,
+    required this.onSubmitAbsence,
     required this.deliveriesStream,
     required this.productsStream,
+    required this.cashAdvancesStream,
     required this.onCreateDelivery,
   });
 
@@ -88,6 +96,33 @@ class _DeliveryCheckerDashboardState extends State<DeliveryCheckerDashboard> wit
             ],
           ),
         ),
+        SizedBox(height: BaycelSpacing.md),
+        _AbsenceFormCard(onSubmit: widget.onSubmitAbsence),
+        SizedBox(height: BaycelSpacing.md),
+        _AbsenceRequestsCard(firestore: widget.firestore),
+        SizedBox(height: BaycelSpacing.md),
+        CashAdvanceCard(onSubmit: (amount, reason) async {
+          try {
+            final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+            await widget.firestore.addCashAdvance(CashAdvance(
+              id: '',
+              employeeId: uid,
+              employeeName: widget.staffName,
+              amount: double.tryParse(amount) ?? 0,
+              reason: reason,
+              requestedAt: DateTime.now(),
+            ));
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Cash advance request submitted')));
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Unable to submit request. Please try again.'), backgroundColor: BaycelColors.error),
+              );
+            }
+          }
+        }),
+        SizedBox(height: BaycelSpacing.md),
+        MyRequestsCard(requestsStream: widget.cashAdvancesStream),
       ],
     );
   }
@@ -177,7 +212,7 @@ class _CreateDeliveryCard extends StatefulWidget {
 class _CreateDeliveryCardState extends State<_CreateDeliveryCard> {
   final _supplierController = TextEditingController();
   final _itemNameController = TextEditingController();
-  final _itemQtyController = TextEditingController();
+  final _itemQtyController = TextEditingController(text: '1');
   final List<Map<String, String>> _items = [];
 
   @override
@@ -196,14 +231,55 @@ class _CreateDeliveryCardState extends State<_CreateDeliveryCard> {
       return;
     }
     setState(() {
-      _items.add({'name': name, 'qty': qty.toString()});
+      final existing = _items.indexWhere((i) => i['name']!.toLowerCase() == name.toLowerCase());
+      if (existing >= 0) {
+        final currentQty = int.tryParse(_items[existing]['qty']!) ?? 0;
+        _items[existing]['qty'] = (currentQty + qty).toString();
+      } else {
+        _items.add({'name': name, 'qty': qty.toString()});
+      }
     });
     _itemNameController.clear();
-    _itemQtyController.clear();
+    _itemQtyController.text = '1';
+  }
+
+  void _decrementItem(int index) {
+    setState(() {
+      final currentQty = int.tryParse(_items[index]['qty']!) ?? 0;
+      if (currentQty <= 1) {
+        _items.removeAt(index);
+      } else {
+        _items[index]['qty'] = (currentQty - 1).toString();
+      }
+    });
   }
 
   void _removeItem(int index) {
     setState(() => _items.removeAt(index));
+  }
+
+  void _editItemName(int index) {
+    final controller = TextEditingController(text: _items[index]['name']);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Edit Product Name'),
+        content: TextField(controller: controller, autofocus: true, decoration: InputDecoration(hintText: 'Product name')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              final newName = controller.text.trim();
+              if (newName.isNotEmpty) {
+                setState(() => _items[index]['name'] = newName);
+              }
+              Navigator.pop(ctx);
+            },
+            child: Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _submit() {
@@ -301,6 +377,7 @@ class _CreateDeliveryCardState extends State<_CreateDeliveryCard> {
       decoration: BaycelComponents.card,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text('Create Delivery Record', style: BaycelTypography.title),
           SizedBox(height: BaycelSpacing.md),
@@ -332,25 +409,92 @@ class _CreateDeliveryCardState extends State<_CreateDeliveryCard> {
           ),
           SizedBox(height: BaycelSpacing.sm),
           if (_items.isNotEmpty) ...[
-            ...List.generate(_items.length, (i) => Padding(
-              padding: EdgeInsets.only(bottom: BaycelSpacing.xs),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: Text(_items[i]['name']!, style: BaycelTypography.bodySm.copyWith(fontSize: 12.5, fontWeight: FontWeight.w600)),
-                  ),
-                  SizedBox(width: BaycelSpacing.sm),
-                  Text('x${_items[i]['qty']}', style: BaycelTypography.dataMono.copyWith(fontSize: 12)),
-                  SizedBox(width: BaycelSpacing.sm),
-                  GestureDetector(
-                    onTap: () => _removeItem(i),
-                    child: Icon(Icons.close, size: 14, color: BaycelColors.error),
-                  ),
-                ],
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: 120),
+              child: Container(
+                padding: EdgeInsets.all(BaycelSpacing.sm),
+                decoration: BoxDecoration(
+                  color: BaycelColors.surface,
+                  borderRadius: BorderRadius.circular(BaycelRadius.md),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.checklist, size: 14, color: BaycelColors.textMuted),
+                        SizedBox(width: BaycelSpacing.xs),
+                        Text('Delivery Checklist (${_items.length} items)', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
+                      ],
+                    ),
+                    SizedBox(height: BaycelSpacing.sm),
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _items.length,
+                        itemBuilder: (context, i) => Padding(
+                          padding: EdgeInsets.only(bottom: BaycelSpacing.sm),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(_items[i]['name']!, style: BaycelTypography.bodySm.copyWith(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                              ),
+                              GestureDetector(
+                                onTap: () => _editItemName(i),
+                                child: Container(
+                                  width: 24, height: 24,
+                                  decoration: BoxDecoration(
+                                    color: BaycelColors.blue.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(BaycelRadius.sm),
+                                  ),
+                                  child: Icon(Icons.edit, size: 13, color: BaycelColors.blue),
+                                ),
+                              ),
+                              SizedBox(width: BaycelSpacing.sm),
+                              GestureDetector(
+                                onTap: () => _decrementItem(i),
+                                child: Container(
+                                  width: 24, height: 24,
+                                  decoration: BoxDecoration(
+                                    color: BaycelColors.error.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(BaycelRadius.sm),
+                                  ),
+                                  child: Icon(Icons.remove, size: 14, color: BaycelColors.error),
+                                ),
+                              ),
+                              SizedBox(width: BaycelSpacing.sm),
+                              Text('x${_items[i]['qty']}', style: BaycelTypography.dataMono.copyWith(fontSize: 11, color: BaycelColors.crimson)),
+                              SizedBox(width: BaycelSpacing.sm),
+                              GestureDetector(
+                                onTap: () {
+                                  final currentQty = int.tryParse(_items[i]['qty']!) ?? 0;
+                                  setState(() => _items[i]['qty'] = (currentQty + 1).toString());
+                                },
+                                child: Container(
+                                  width: 24, height: 24,
+                                  decoration: BoxDecoration(
+                                    color: BaycelColors.success.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(BaycelRadius.sm),
+                                  ),
+                                  child: Icon(Icons.add, size: 14, color: BaycelColors.success),
+                                ),
+                              ),
+                              SizedBox(width: BaycelSpacing.sm),
+                              GestureDetector(
+                                onTap: () => _removeItem(i),
+                                child: Icon(Icons.close, size: 14, color: BaycelColors.textDisabled),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            )),
-            SizedBox(height: BaycelSpacing.xs),
+            ),
+            SizedBox(height: BaycelSpacing.sm),
           ],
           Row(
             children: [
@@ -365,15 +509,49 @@ class _CreateDeliveryCardState extends State<_CreateDeliveryCard> {
                 ),
               ),
               SizedBox(width: BaycelSpacing.sm),
-              Expanded(
-                flex: 1,
+              GestureDetector(
+                onTap: () {
+                  final current = int.tryParse(_itemQtyController.text) ?? 0;
+                  if (current > 1) _itemQtyController.text = (current - 1).toString();
+                },
+                child: Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(
+                    color: BaycelColors.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(BaycelRadius.sm),
+                  ),
+                  child: Icon(Icons.remove, size: 16, color: BaycelColors.error),
+                ),
+              ),
+              SizedBox(width: BaycelSpacing.xs),
+              SizedBox(
+                width: 32,
                 child: TextField(
                   controller: _itemQtyController,
                   keyboardType: TextInputType.number,
-                  style: BaycelTypography.body.copyWith(fontSize: 13),
-                  decoration: BaycelComponents.input.copyWith(
-                    hintText: 'Qty', filled: true, fillColor: BaycelColors.card),
-                  onSubmitted: (_) => _addItem(),
+                  textAlign: TextAlign.center,
+                  style: BaycelTypography.dataMono.copyWith(fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: '1',
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                    isDense: true,
+                  ),
+                ),
+              ),
+              SizedBox(width: BaycelSpacing.xs),
+              GestureDetector(
+                onTap: () {
+                  final current = int.tryParse(_itemQtyController.text) ?? 0;
+                  _itemQtyController.text = (current + 1).toString();
+                },
+                child: Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(
+                    color: BaycelColors.success.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(BaycelRadius.sm),
+                  ),
+                  child: Icon(Icons.add, size: 16, color: BaycelColors.success),
                 ),
               ),
               SizedBox(width: BaycelSpacing.sm),
@@ -382,12 +560,12 @@ class _CreateDeliveryCardState extends State<_CreateDeliveryCard> {
                 child: Container(
                   width: 32, height: 32,
                   decoration: BoxDecoration(color: BaycelColors.crimson, borderRadius: BorderRadius.circular(BaycelRadius.md)),
-                  child: Icon(Icons.add, color: Colors.white, size: 16),
+                  child: Icon(Icons.save, color: Colors.white, size: 16),
                 ),
               ),
             ],
           ),
-          SizedBox(height: BaycelSpacing.md),
+          SizedBox(height: BaycelSpacing.sm),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -395,7 +573,19 @@ class _CreateDeliveryCardState extends State<_CreateDeliveryCard> {
               style: BaycelComponents.buttonPrimary.copyWith(
                 padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: BaycelSpacing.buttonHorizontal, vertical: BaycelSpacing.buttonVertical)),
               ),
-              child: Text('Encode Delivery', style: BaycelTypography.label.copyWith(color: Colors.white, fontSize: 12.5)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.save, size: 16, color: Colors.white),
+                  SizedBox(width: BaycelSpacing.sm),
+                  Text(
+                    _items.isEmpty
+                      ? 'Encode Delivery'
+                      : 'Encode Delivery (${_items.length} items)',
+                    style: BaycelTypography.label.copyWith(color: Colors.white, fontSize: 12.5),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -591,6 +781,7 @@ class _VerifyDeliveriesCardState extends State<_VerifyDeliveriesCard> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
@@ -621,64 +812,101 @@ class _VerifyDeliveriesCardState extends State<_VerifyDeliveriesCard> {
           if (d.items.isNotEmpty) ...[
             SizedBox(height: BaycelSpacing.sm),
             Divider(height: 1, color: BaycelColors.divider),
-            ...List.generate(d.items.length, (i) {
-              final item = d.items[i];
-              final ctrl = _getReceivedController(d.id, i);
-              final received = int.tryParse(ctrl.text) ?? 0;
-              final itemVerified = received == item.expectedQuantity;
-              final itemDiscrepancy = received > 0 && !itemVerified;
-              return Padding(
-                padding: EdgeInsets.symmetric(vertical: BaycelSpacing.xs),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(item.productName, style: BaycelTypography.bodySm.copyWith(fontSize: 12, fontWeight: FontWeight.w500)),
-                          SizedBox(height: 2),
-                          Text('Expected: ${item.expectedQuantity}', style: BaycelTypography.labelXs.copyWith(color: BaycelColors.textMuted)),
-                        ],
-                      ),
-                    ),
-                    SizedBox(width: BaycelSpacing.sm),
-                    SizedBox(
-                      width: 56,
-                      child: TextField(
-                        controller: ctrl,
-                        keyboardType: TextInputType.number,
-                        style: BaycelTypography.dataMono.copyWith(fontSize: 12),
-                        textAlign: TextAlign.center,
-                        decoration: BaycelComponents.input.copyWith(
-                          hintText: '0',
-                          filled: true,
-                          fillColor: BaycelColors.card,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: 120),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: d.items.length,
+                itemBuilder: (context, i) {
+                  final item = d.items[i];
+                  final ctrl = _getReceivedController(d.id, i);
+                  return Padding(
+                    padding: EdgeInsets.symmetric(vertical: BaycelSpacing.xs),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(item.productName, style: BaycelTypography.bodySm.copyWith(fontSize: 12, fontWeight: FontWeight.w500)),
+                              SizedBox(height: 2),
+                              Text('Expected: ${item.expectedQuantity}', style: BaycelTypography.labelXs.copyWith(color: BaycelColors.textMuted)),
+                            ],
+                          ),
                         ),
-                        onChanged: (_) => setState(() {}),
-                      ),
+                        SizedBox(width: BaycelSpacing.sm),
+                        GestureDetector(
+                          onTap: () {
+                            final current = int.tryParse(ctrl.text) ?? 0;
+                            if (current > 0) {
+                              ctrl.text = (current - 1).toString();
+                            }
+                          },
+                          child: Container(
+                            width: 24, height: 24,
+                            decoration: BoxDecoration(
+                              color: BaycelColors.error.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(BaycelRadius.sm),
+                            ),
+                            child: Icon(Icons.remove, size: 14, color: BaycelColors.error),
+                          ),
+                        ),
+                        SizedBox(width: BaycelSpacing.sm),
+                        ListenableBuilder(
+                          listenable: ctrl,
+                          builder: (context, _) => Text('x${ctrl.text.isEmpty ? '0' : ctrl.text}', style: BaycelTypography.dataMono.copyWith(fontSize: 11, color: BaycelColors.crimson)),
+                        ),
+                        SizedBox(width: BaycelSpacing.sm),
+                        GestureDetector(
+                          onTap: () {
+                            final current = int.tryParse(ctrl.text) ?? 0;
+                            ctrl.text = (current + 1).toString();
+                          },
+                          child: Container(
+                            width: 24, height: 24,
+                            decoration: BoxDecoration(
+                              color: BaycelColors.success.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(BaycelRadius.sm),
+                            ),
+                            child: Icon(Icons.add, size: 14, color: BaycelColors.success),
+                          ),
+                        ),
+                        SizedBox(width: BaycelSpacing.sm),
+                        ListenableBuilder(
+                          listenable: ctrl,
+                          builder: (context, _) {
+                            final r = int.tryParse(ctrl.text) ?? 0;
+                            final verified = r == item.expectedQuantity;
+                            final discrepancy = r > 0 && !verified;
+                            if (verified) return Icon(Icons.check_circle, size: 16, color: BaycelColors.success);
+                            if (discrepancy) return Icon(Icons.warning, size: 16, color: BaycelColors.error);
+                            return Icon(Icons.radio_button_unchecked, size: 16, color: BaycelColors.textDisabled);
+                          },
+                        ),
+                      ],
                     ),
-                    SizedBox(width: BaycelSpacing.sm),
-                    if (itemVerified)
-                      Icon(Icons.check_circle, size: 16, color: BaycelColors.success)
-                    else if (itemDiscrepancy)
-                      Icon(Icons.warning, size: 16, color: BaycelColors.error)
-                    else
-                      Icon(Icons.radio_button_unchecked, size: 16, color: BaycelColors.textDisabled),
-                  ],
-                ),
-              );
-            }),
+                  );
+                },
+              ),
+            ),
           ],
           SizedBox(height: BaycelSpacing.sm),
           if (d.items.isEmpty)
             Text('No products recorded', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: allVerified ? () async {
+          SizedBox(height: BaycelSpacing.sm),
+          ListenableBuilder(
+            listenable: Listenable.merge([
+              for (int i = 0; i < d.items.length; i++)
+                _getReceivedController(d.id, i),
+            ]),
+            builder: (context, _) {
+              final allVerified = d.items.isNotEmpty && _allItemsVerified(d);
+              return Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: allVerified ? () async {
                     final confirmed = await showDialog<bool>(
                       context: context,
                       builder: (ctx) => AlertDialog(
@@ -803,11 +1031,202 @@ class _VerifyDeliveriesCardState extends State<_VerifyDeliveriesCard> {
                   ),
                   child: Text('Report Discrepancy', style: BaycelTypography.label.copyWith(fontSize: 11.5)),
                 ),
-              ),
-            ],
+                ),
+              ],
+            );
+            },
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AbsenceFormCard extends StatefulWidget {
+  final void Function(DateTime startDate, DateTime endDate, String reason) onSubmit;
+
+  const _AbsenceFormCard({required this.onSubmit});
+
+  @override
+  State<_AbsenceFormCard> createState() => _AbsenceFormCardState();
+}
+
+class _AbsenceFormCardState extends State<_AbsenceFormCard> {
+  DateTime? _startDate;
+  DateTime? _endDate;
+  final _reasonController = TextEditingController();
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  void _pickDates() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: now,
+      lastDate: now.add(Duration(days: 365)),
+      initialDateRange: _startDate != null && _endDate != null
+        ? DateTimeRange(start: _startDate!, end: _endDate!)
+        : null,
+    );
+    if (picked != null) {
+      setState(() {
+        _startDate = picked.start;
+        _endDate = picked.end;
+      });
+    }
+  }
+
+  void _submit() {
+    final reason = _reasonController.text.trim();
+    if (_startDate == null || reason.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Select dates and enter a reason')));
+      return;
+    }
+    widget.onSubmit(_startDate!, _endDate ?? _startDate!, reason);
+    _reasonController.clear();
+    setState(() {
+      _startDate = null;
+      _endDate = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dateText = _startDate != null
+      ? _endDate != null && !_startDate!.isAtSameMomentAs(_endDate!)
+        ? '${_startDate!.month}/${_startDate!.day} \u2013 ${_endDate!.month}/${_endDate!.day}'
+        : '${_startDate!.month}/${_startDate!.day}'
+      : '';
+
+    return Container(
+      padding: EdgeInsets.all(BaycelSpacing.base),
+      decoration: BaycelComponents.card,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Submit Absence Form', style: BaycelTypography.title),
+          SizedBox(height: BaycelSpacing.xxs),
+          Text('Requests are reviewed by your Manager',
+            style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 11.5)),
+          SizedBox(height: BaycelSpacing.md),
+          buildFieldLabel('Date(s)'),
+          SizedBox(height: 5),
+          GestureDetector(
+            onTap: _pickDates,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: BaycelColors.card,
+                borderRadius: BorderRadius.circular(BaycelRadius.md),
+                border: Border.all(color: BaycelColors.divider),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.date_range, size: 18, color: BaycelColors.textSecondary),
+                  SizedBox(width: BaycelSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      dateText.isEmpty ? 'Select date range' : dateText,
+                      style: BaycelTypography.body.copyWith(
+                        fontSize: 13,
+                        color: dateText.isEmpty ? BaycelColors.textDisabled : BaycelColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, size: 16, color: BaycelColors.textDisabled),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: BaycelSpacing.md),
+          buildFieldLabel('Reason'),
+          SizedBox(height: 5),
+          TextField(
+            controller: _reasonController,
+            style: BaycelTypography.body.copyWith(fontSize: 13),
+            decoration: BaycelComponents.input.copyWith(
+              hintText: 'Brief reason for absence', filled: true, fillColor: BaycelColors.card),
+          ),
+          SizedBox(height: BaycelSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _submit,
+              style: BaycelComponents.buttonPrimary.copyWith(
+                padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: BaycelSpacing.buttonHorizontal, vertical: BaycelSpacing.buttonVertical)),
+              ),
+              child: Text('Submit Request', style: BaycelTypography.label.copyWith(color: Colors.white, fontSize: 12.5)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AbsenceRequestsCard extends StatelessWidget {
+  final FirestoreService firestore;
+
+  const _AbsenceRequestsCard({required this.firestore});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<AbsenceForm>>(
+      stream: firestore.getAbsenceForms(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            padding: EdgeInsets.all(BaycelSpacing.base),
+            decoration: BaycelComponents.card,
+            child: const SkeletonListTile(),
+          );
+        }
+        final List<AbsenceForm> forms = snapshot.data ?? [];
+        final List<AbsenceForm> myForms = forms.where((AbsenceForm f) =>
+          f.employeeId == FirebaseAuth.instance.currentUser?.uid).take(5).toList();
+
+        return Container(
+          padding: EdgeInsets.all(BaycelSpacing.base),
+          decoration: BaycelComponents.card,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('My Absence Requests', style: BaycelTypography.title),
+              SizedBox(height: BaycelSpacing.sm),
+              if (myForms.isEmpty)
+                Center(child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: BaycelSpacing.lg),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.event_busy, size: 32, color: BaycelColors.textDisabled),
+                      SizedBox(height: BaycelSpacing.sm),
+                      Text('No requests yet', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)),
+                    ],
+                  ),
+                ))
+              else
+                ...myForms.map((f) {
+                  final statusColor = f.status == AbsenceStatus.approved
+                    ? BaycelColors.success
+                    : f.status == AbsenceStatus.rejected
+                      ? BaycelColors.crimson
+                      : BaycelColors.marigoldDark;
+                  return buildAbsenceRequestRow(
+                    f.reason,
+                    'Submitted',
+                    f.status.value[0].toUpperCase() + f.status.value.substring(1),
+                    statusColor,
+                  );
+                }),
+            ],
+          ),
+        );
+      },
     );
   }
 }
