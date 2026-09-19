@@ -493,8 +493,9 @@ class _TopbarIconBtn extends StatefulWidget {
   final IconData icon;
   final bool hasBadge;
   final VoidCallback onTap;
+  final String? tooltip;
 
-  const _TopbarIconBtn({required this.icon, required this.hasBadge, required this.onTap});
+  const _TopbarIconBtn({required this.icon, required this.hasBadge, required this.onTap, this.tooltip});
 
   @override
   State<_TopbarIconBtn> createState() => _TopbarIconBtnState();

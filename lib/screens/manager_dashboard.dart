@@ -413,9 +413,9 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
                           Text(labels[i], style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 10)),
                         ],
                       ),
-                    ),
-                  );
-                }),
+                    );
+                  }),
+                ),
               ),
             ),
         ],

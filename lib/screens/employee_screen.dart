@@ -420,6 +420,24 @@ class _EmployeeCard extends StatelessWidget {
       );
     }
 
+    InputDecoration _fieldDeco(String hint) => BaycelComponents.input.copyWith(
+      hintText: hint,
+      filled: true,
+      fillColor: BaycelColors.card,
+      contentPadding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: 10),
+    );
+
+    Widget _label(String text) => Padding(
+      padding: EdgeInsets.only(bottom: BaycelSpacing.xxs),
+      child: Text(text, style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textSecondary, fontSize: 11)),
+    );
+
+    Widget _sectionTitle(String text) => Padding(
+      padding: EdgeInsets.only(top: BaycelSpacing.md, bottom: BaycelSpacing.xs),
+      child: Text(text, style: BaycelTypography.labelSm.copyWith(
+        color: BaycelColors.textMuted, fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.05)),
+    );
+
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
