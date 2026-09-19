@@ -278,9 +278,13 @@ class FirestoreService {
             .toList());
   }
 
-  Future<void> updateAbsenceFormStatus(String id, String status) async {
+  Future<void> updateAbsenceFormStatus(String id, String status, {String? rejectionComment}) async {
     try {
-      await _absenceForms.doc(id).update({'status': status});
+      final data = <String, dynamic>{'status': status, 'reviewedAt': DateTime.now()};
+      if (rejectionComment != null && rejectionComment.isNotEmpty) {
+        data['rejectionComment'] = rejectionComment;
+      }
+      await _absenceForms.doc(id).update(data);
     } catch (e) {
       throw Exception('Failed to update absence form. Please try again.');
     }

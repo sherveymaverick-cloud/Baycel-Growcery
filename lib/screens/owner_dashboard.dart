@@ -29,7 +29,6 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
   bool _isProcessingCashAdvance = false;
   final Set<String> _recentlyActionedAbsences = {};
   final Set<String> _recentlyActionedCashAdvances = {};
-  final Set<String> _viewingAbsences = {};
 
 
   final _statsKey = GlobalKey();
@@ -366,10 +365,10 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
     final statusLabel = form.status.value[0].toUpperCase() + form.status.value.substring(1);
     final dateRange = '${form.startDate.month}/${form.startDate.day} - ${form.endDate.month}/${form.endDate.day}';
     final isRecentlyActioned = _recentlyActionedAbsences.contains(form.id);
-    final isViewing = _viewingAbsences.contains(form.id);
 
     if (isRecentlyActioned) {
       return Container(
+        margin: EdgeInsets.only(bottom: BaycelSpacing.sm),
         padding: EdgeInsets.symmetric(vertical: 9, horizontal: BaycelSpacing.sm),
         decoration: BoxDecoration(
           color: (form.status == AbsenceStatus.approved ? BaycelColors.success : BaycelColors.error).withValues(alpha: 0.06),
@@ -383,150 +382,261 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
               color: form.status == AbsenceStatus.approved ? BaycelColors.success : BaycelColors.error,
             ),
             SizedBox(width: BaycelSpacing.sm),
-            Text(
-              '${form.employeeName} — ${form.status == AbsenceStatus.approved ? 'Approved' : 'Rejected'}',
-              style: BaycelTypography.bodySm.copyWith(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: form.status == AbsenceStatus.approved ? BaycelColors.success : BaycelColors.error,
+            Expanded(
+              child: Text(
+                '${form.employeeName} — ${form.status == AbsenceStatus.approved ? 'Approved' : 'Rejected'}',
+                style: BaycelTypography.bodySm.copyWith(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: form.status == AbsenceStatus.approved ? BaycelColors.success : BaycelColors.error,
+                ),
               ),
             ),
+            if (form.status == AbsenceStatus.rejected && form.rejectionComment != null && form.rejectionComment!.isNotEmpty)
+              Icon(Icons.comment_outlined, size: 14, color: BaycelColors.error),
           ],
         ),
       );
     }
 
-    return Container(
-      margin: EdgeInsets.only(bottom: BaycelSpacing.sm),
-      padding: EdgeInsets.all(BaycelSpacing.md),
-      decoration: BoxDecoration(
-        color: BaycelColors.card,
-        border: Border.all(color: BaycelColors.divider.withValues(alpha: 0.6), width: 0.5),
-        borderRadius: BorderRadius.circular(BaycelRadius.md),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36, height: 36,
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Icons.person_outline, color: statusColor, size: 18),
-              ),
-              SizedBox(width: BaycelSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(form.employeeName, style: BaycelTypography.body.copyWith(fontSize: 13, fontWeight: FontWeight.w600)),
-                    SizedBox(height: 2),
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.sm, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(BaycelRadius.full),
-                      ),
-                      child: Text(statusLabel, style: BaycelTypography.labelXs.copyWith(color: statusColor, fontWeight: FontWeight.w600)),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+    return Column(
+      children: [
+        Container(
+          margin: EdgeInsets.only(bottom: BaycelSpacing.sm),
+          padding: EdgeInsets.all(BaycelSpacing.md),
+          decoration: BoxDecoration(
+            color: BaycelColors.card,
+            border: Border.all(color: BaycelColors.divider.withValues(alpha: 0.6), width: 0.5),
+            borderRadius: BorderRadius.circular(BaycelRadius.md),
           ),
-          SizedBox(height: BaycelSpacing.sm),
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(BaycelSpacing.sm),
-            decoration: BoxDecoration(
-              color: BaycelColors.surface,
-              borderRadius: BorderRadius.circular(BaycelRadius.sm),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36, height: 36,
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.person_outline, color: statusColor, size: 18),
+                  ),
+                  SizedBox(width: BaycelSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(form.employeeName, style: BaycelTypography.body.copyWith(fontSize: 13, fontWeight: FontWeight.w600)),
+                        SizedBox(height: 2),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.sm, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(BaycelRadius.full),
+                          ),
+                          child: Text(statusLabel, style: BaycelTypography.labelXs.copyWith(color: statusColor, fontWeight: FontWeight.w600)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: BaycelSpacing.sm),
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(BaycelSpacing.sm),
+                decoration: BoxDecoration(
+                  color: BaycelColors.surface,
+                  borderRadius: BorderRadius.circular(BaycelRadius.sm),
+                ),
+                child: Row(
                   children: [
                     Icon(Icons.calendar_today, size: 12, color: BaycelColors.textMuted),
                     SizedBox(width: BaycelSpacing.xs),
                     Text(dateRange, style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
                   ],
                 ),
-                if (isViewing) ...[
-                  SizedBox(height: BaycelSpacing.xs),
+              ),
+              if (form.status == AbsenceStatus.pending) ...[
+                SizedBox(height: BaycelSpacing.sm),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showAbsenceDetailDialog(form),
+                    icon: Icon(Icons.visibility_outlined, size: 14, color: BaycelColors.crimson),
+                    label: Text('View Details', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.crimson, fontSize: 11)),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: BaycelColors.crimson.withValues(alpha: 0.3)),
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showAbsenceDetailDialog(AbsenceForm form) {
+    final commentController = TextEditingController();
+    bool isProcessing = false;
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            margin: EdgeInsets.all(BaycelSpacing.md),
+            padding: EdgeInsets.all(BaycelSpacing.lg),
+            decoration: BoxDecoration(
+              color: BaycelColors.card,
+              borderRadius: BorderRadius.circular(BaycelRadius.lg),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 20, offset: Offset(0, 8))],
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.notes, size: 12, color: BaycelColors.textMuted),
-                      SizedBox(width: BaycelSpacing.xs),
+                      Container(
+                        width: 40, height: 40,
+                        decoration: BoxDecoration(
+                          color: BaycelColors.marigoldDark.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.person_outline, color: BaycelColors.marigoldDark, size: 20),
+                      ),
+                      SizedBox(width: BaycelSpacing.sm),
                       Expanded(
-                        child: Text(form.reason, style: BaycelTypography.bodySm.copyWith(fontSize: 12, color: BaycelColors.textSecondary)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(form.employeeName, style: BaycelTypography.body.copyWith(fontSize: 15, fontWeight: FontWeight.w700)),
+                            SizedBox(height: 2),
+                            Text('${form.startDate.month}/${form.startDate.day} - ${form.endDate.month}/${form.endDate.day}', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: Icon(Icons.close, size: 20, color: BaycelColors.textMuted),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: BaycelSpacing.md),
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(BaycelSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: BaycelColors.surface,
+                      borderRadius: BorderRadius.circular(BaycelRadius.sm),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.notes, size: 13, color: BaycelColors.textMuted),
+                            SizedBox(width: BaycelSpacing.xs),
+                            Text('Reason', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
+                          ],
+                        ),
+                        SizedBox(height: BaycelSpacing.xs),
+                        Text(form.reason, style: BaycelTypography.bodySm.copyWith(fontSize: 12.5, color: BaycelColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: BaycelSpacing.md),
+                  Text('Rejection Comment (optional)', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
+                  SizedBox(height: BaycelSpacing.xs),
+                  TextField(
+                    controller: commentController,
+                    maxLines: 2,
+                    style: BaycelTypography.bodySm.copyWith(fontSize: 12.5),
+                    decoration: InputDecoration(
+                      hintText: 'State the reason for rejection...',
+                      hintStyle: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 12),
+                      contentPadding: EdgeInsets.all(BaycelSpacing.sm),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(BaycelRadius.sm),
+                        borderSide: BorderSide(color: BaycelColors.divider),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(BaycelRadius.sm),
+                        borderSide: BorderSide(color: BaycelColors.divider),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(BaycelRadius.sm),
+                        borderSide: BorderSide(color: BaycelColors.crimson),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: BaycelSpacing.lg),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: isProcessing ? null : () async {
+                            setDialogState(() => isProcessing = true);
+                            final comment = commentController.text.trim();
+                            try {
+                              await _firestore.updateAbsenceFormStatus(form.id, 'rejected', rejectionComment: comment);
+                              _recentlyActionedAbsences.add(form.id);
+                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Absence rejected')));
+                            } catch (e) {
+                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update'), backgroundColor: BaycelColors.error));
+                            }
+                            if (mounted) Navigator.pop(ctx);
+                          },
+                          icon: Icon(Icons.close, size: 14, color: BaycelColors.error),
+                          label: Text('Reject', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.error, fontSize: 11)),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: BaycelColors.error.withValues(alpha: 0.3)),
+                            padding: EdgeInsets.symmetric(vertical: 10),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: BaycelSpacing.sm),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: isProcessing ? null : () async {
+                            setDialogState(() => isProcessing = true);
+                            try {
+                              await _firestore.updateAbsenceFormStatus(form.id, 'approved');
+                              _recentlyActionedAbsences.add(form.id);
+                              DateTime current = form.startDate;
+                              while (!current.isAfter(form.endDate)) {
+                                final dateStr = '${current.year}-${current.month.toString().padLeft(2, '0')}-${current.day.toString().padLeft(2, '0')}';
+                                await _firestore.addAttendance(AttendanceRecord(
+                                  id: '', employeeId: form.employeeId, date: dateStr, timeIn: '', totalHours: 0, status: AttendanceStatus.onLeave,
+                                ));
+                                current = current.add(Duration(days: 1));
+                              }
+                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Absence approved')));
+                            } catch (e) {
+                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update'), backgroundColor: BaycelColors.error));
+                            }
+                            if (mounted) Navigator.pop(ctx);
+                          },
+                          icon: Icon(Icons.check, size: 14, color: Colors.white),
+                          label: Text('Approve', style: BaycelTypography.labelSm.copyWith(color: Colors.white, fontSize: 11)),
+                          style: BaycelComponents.buttonPrimary.copyWith(
+                            padding: WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 10)),
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ],
-              ],
+              ),
             ),
           ),
-          if (form.status == AbsenceStatus.pending) ...[
-            SizedBox(height: BaycelSpacing.sm),
-            if (!isViewing)
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => setState(() => _viewingAbsences.add(form.id)),
-                  icon: Icon(Icons.visibility_outlined, size: 14, color: BaycelColors.crimson),
-                  label: Text('View Details', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.crimson, fontSize: 11)),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: BaycelColors.crimson.withValues(alpha: 0.3)),
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                  ),
-                ),
-              )
-            else
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => setState(() => _viewingAbsences.remove(form.id)),
-                      icon: Icon(Icons.arrow_back, size: 14, color: BaycelColors.textMuted),
-                      label: Text('Back', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: BaycelColors.divider),
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: BaycelSpacing.sm),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _isProcessingAbsence ? null : () => _reviewAbsence(form.id, 'rejected', form),
-                      icon: Icon(Icons.close, size: 14, color: BaycelColors.error),
-                      label: Text('Reject', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.error, fontSize: 11)),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: BaycelColors.error.withValues(alpha: 0.3)),
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: BaycelSpacing.sm),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _isProcessingAbsence ? null : () => _reviewAbsence(form.id, 'approved', form),
-                      icon: Icon(Icons.check, size: 14, color: Colors.white),
-                      label: Text('Approve', style: BaycelTypography.labelSm.copyWith(color: Colors.white, fontSize: 11)),
-                      style: BaycelComponents.buttonPrimary.copyWith(
-                        padding: WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 8)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -574,42 +684,6 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to approve some requests'), backgroundColor: BaycelColors.error),
       );
-    } finally {
-      if (mounted) setState(() => _isProcessingAbsence = false);
-    }
-  }
-
-  void _reviewAbsence(String id, String status, AbsenceForm form) async {
-    setState(() => _isProcessingAbsence = true);
-    try {
-      await _firestore.updateAbsenceFormStatus(id, status);
-      _recentlyActionedAbsences.add(id);
-
-      if (status == 'approved') {
-        DateTime current = form.startDate;
-        while (!current.isAfter(form.endDate)) {
-          final dateStr = '${current.year}-${current.month.toString().padLeft(2, '0')}-${current.day.toString().padLeft(2, '0')}';
-          await _firestore.addAttendance(AttendanceRecord(
-            id: '',
-            employeeId: form.employeeId,
-            date: dateStr,
-            timeIn: '',
-            totalHours: 0,
-            status: AttendanceStatus.onLeave,
-          ));
-          current = current.add(Duration(days: 1));
-        }
-      }
-
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Absence ${status == 'approved' ? 'approved' : 'rejected'}')),
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update. Please try again.'), backgroundColor: BaycelColors.error),
-        );
-      }
     } finally {
       if (mounted) setState(() => _isProcessingAbsence = false);
     }
@@ -705,6 +779,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
 
     if (isRecentlyActioned) {
       return Container(
+        margin: EdgeInsets.only(bottom: BaycelSpacing.sm),
         padding: EdgeInsets.symmetric(vertical: 9, horizontal: BaycelSpacing.sm),
         decoration: BoxDecoration(
           color: (advance.status == CashAdvanceStatus.approved ? BaycelColors.success : BaycelColors.error).withValues(alpha: 0.06),
@@ -718,14 +793,18 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
               color: advance.status == CashAdvanceStatus.approved ? BaycelColors.success : BaycelColors.error,
             ),
             SizedBox(width: BaycelSpacing.sm),
-            Text(
-              '${advance.employeeName} — ${advance.status == CashAdvanceStatus.approved ? 'Approved' : 'Rejected'} \u20B1${advance.amount.toStringAsFixed(0)}',
-              style: BaycelTypography.bodySm.copyWith(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: advance.status == CashAdvanceStatus.approved ? BaycelColors.success : BaycelColors.error,
+            Expanded(
+              child: Text(
+                '${advance.employeeName} — ${advance.status == CashAdvanceStatus.approved ? 'Approved' : 'Rejected'} \u20B1${advance.amount.toStringAsFixed(0)}',
+                style: BaycelTypography.bodySm.copyWith(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: advance.status == CashAdvanceStatus.approved ? BaycelColors.success : BaycelColors.error,
+                ),
               ),
             ),
+            if (advance.status == CashAdvanceStatus.rejected && advance.reviewNote != null && advance.reviewNote!.isNotEmpty)
+              Icon(Icons.comment_outlined, size: 14, color: BaycelColors.error),
           ],
         ),
       );
@@ -781,60 +860,196 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
               color: BaycelColors.surface,
               borderRadius: BorderRadius.circular(BaycelRadius.sm),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.calendar_today, size: 12, color: BaycelColors.textMuted),
-                    SizedBox(width: BaycelSpacing.xs),
-                    Text(date, style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
-                  ],
-                ),
-                SizedBox(height: BaycelSpacing.xs),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.notes, size: 12, color: BaycelColors.textMuted),
-                    SizedBox(width: BaycelSpacing.xs),
-                    Expanded(
-                      child: Text(advance.reason, style: BaycelTypography.bodySm.copyWith(fontSize: 12, color: BaycelColors.textSecondary)),
-                    ),
-                  ],
-                ),
+                Icon(Icons.calendar_today, size: 12, color: BaycelColors.textMuted),
+                SizedBox(width: BaycelSpacing.xs),
+                Text(date, style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
               ],
             ),
           ),
           if (advance.status == CashAdvanceStatus.pending) ...[
             SizedBox(height: BaycelSpacing.sm),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _isProcessingCashAdvance ? null : () => _reviewCashAdvance(advance.id, 'rejected'),
-                    icon: Icon(Icons.close, size: 14, color: BaycelColors.error),
-                    label: Text('Reject', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.error, fontSize: 11)),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: BaycelColors.error.withValues(alpha: 0.3)),
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                    ),
-                  ),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _showCashAdvanceDetailDialog(advance),
+                icon: Icon(Icons.visibility_outlined, size: 14, color: BaycelColors.crimson),
+                label: Text('View Details', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.crimson, fontSize: 11)),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: BaycelColors.crimson.withValues(alpha: 0.3)),
+                  padding: EdgeInsets.symmetric(vertical: 8),
                 ),
-                SizedBox(width: BaycelSpacing.sm),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isProcessingCashAdvance ? null : () => _reviewCashAdvance(advance.id, 'approved'),
-                    icon: Icon(Icons.check, size: 14, color: Colors.white),
-                    label: Text('Approve', style: BaycelTypography.labelSm.copyWith(color: Colors.white, fontSize: 11)),
-                    style: BaycelComponents.buttonPrimary.copyWith(
-                      padding: WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 8)),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  void _showCashAdvanceDetailDialog(CashAdvance advance) {
+    final commentController = TextEditingController();
+    bool isProcessing = false;
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            margin: EdgeInsets.all(BaycelSpacing.md),
+            padding: EdgeInsets.all(BaycelSpacing.lg),
+            decoration: BoxDecoration(
+              color: BaycelColors.card,
+              borderRadius: BorderRadius.circular(BaycelRadius.lg),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 20, offset: Offset(0, 8))],
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 40, height: 40,
+                        decoration: BoxDecoration(
+                          color: BaycelColors.crimson.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.payments_outlined, color: BaycelColors.crimson, size: 20),
+                      ),
+                      SizedBox(width: BaycelSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(advance.employeeName, style: BaycelTypography.body.copyWith(fontSize: 15, fontWeight: FontWeight.w700)),
+                            SizedBox(height: 2),
+                            Text('${advance.requestedAt.month}/${advance.requestedAt.day}', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      Text('\u20B1${advance.amount.toStringAsFixed(0)}', style: BaycelTypography.title.copyWith(fontSize: 18, color: BaycelColors.crimson)),
+                      SizedBox(width: BaycelSpacing.xs),
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: Icon(Icons.close, size: 20, color: BaycelColors.textMuted),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: BaycelSpacing.md),
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(BaycelSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: BaycelColors.surface,
+                      borderRadius: BorderRadius.circular(BaycelRadius.sm),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.notes, size: 13, color: BaycelColors.textMuted),
+                            SizedBox(width: BaycelSpacing.xs),
+                            Text('Reason', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
+                          ],
+                        ),
+                        SizedBox(height: BaycelSpacing.xs),
+                        Text(advance.reason, style: BaycelTypography.bodySm.copyWith(fontSize: 12.5, color: BaycelColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: BaycelSpacing.md),
+                  Text('Rejection Comment (optional)', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
+                  SizedBox(height: BaycelSpacing.xs),
+                  TextField(
+                    controller: commentController,
+                    maxLines: 2,
+                    style: BaycelTypography.bodySm.copyWith(fontSize: 12.5),
+                    decoration: InputDecoration(
+                      hintText: 'State the reason for rejection...',
+                      hintStyle: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 12),
+                      contentPadding: EdgeInsets.all(BaycelSpacing.sm),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(BaycelRadius.sm),
+                        borderSide: BorderSide(color: BaycelColors.divider),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(BaycelRadius.sm),
+                        borderSide: BorderSide(color: BaycelColors.divider),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(BaycelRadius.sm),
+                        borderSide: BorderSide(color: BaycelColors.crimson),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: BaycelSpacing.lg),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: isProcessing ? null : () async {
+                            setDialogState(() => isProcessing = true);
+                            final comment = commentController.text.trim();
+                            try {
+                              final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+                              await _firestore.updateCashAdvance(advance.id, {
+                                'status': 'rejected',
+                                'reviewedAt': DateTime.now(),
+                                'reviewedBy': uid,
+                                if (comment.isNotEmpty) 'reviewNote': comment,
+                              });
+                              _recentlyActionedCashAdvances.add(advance.id);
+                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Cash advance rejected')));
+                            } catch (e) {
+                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update'), backgroundColor: BaycelColors.error));
+                            }
+                            if (mounted) Navigator.pop(ctx);
+                          },
+                          icon: Icon(Icons.close, size: 14, color: BaycelColors.error),
+                          label: Text('Reject', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.error, fontSize: 11)),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: BaycelColors.error.withValues(alpha: 0.3)),
+                            padding: EdgeInsets.symmetric(vertical: 10),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: BaycelSpacing.sm),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: isProcessing ? null : () async {
+                            setDialogState(() => isProcessing = true);
+                            try {
+                              final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+                              await _firestore.updateCashAdvance(advance.id, {
+                                'status': 'approved',
+                                'reviewedAt': DateTime.now(),
+                                'reviewedBy': uid,
+                              });
+                              _recentlyActionedCashAdvances.add(advance.id);
+                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Cash advance approved')));
+                            } catch (e) {
+                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update'), backgroundColor: BaycelColors.error));
+                            }
+                            if (mounted) Navigator.pop(ctx);
+                          },
+                          icon: Icon(Icons.check, size: 14, color: Colors.white),
+                          label: Text('Approve', style: BaycelTypography.labelSm.copyWith(color: Colors.white, fontSize: 11)),
+                          style: BaycelComponents.buttonPrimary.copyWith(
+                            padding: WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 10)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -874,30 +1089,6 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to approve some requests'), backgroundColor: BaycelColors.error),
       );
-    } finally {
-      if (mounted) setState(() => _isProcessingCashAdvance = false);
-    }
-  }
-
-  void _reviewCashAdvance(String id, String status) async {
-    setState(() => _isProcessingCashAdvance = true);
-    try {
-      final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-      await _firestore.updateCashAdvance(id, {
-        'status': status,
-        'reviewedAt': DateTime.now(),
-        'reviewedBy': uid,
-      });
-      _recentlyActionedCashAdvances.add(id);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Cash advance $status')),
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update. Please try again.'), backgroundColor: BaycelColors.error),
-        );
-      }
     } finally {
       if (mounted) setState(() => _isProcessingCashAdvance = false);
     }
