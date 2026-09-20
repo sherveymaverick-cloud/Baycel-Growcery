@@ -235,6 +235,8 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                 validator: (v) {
                   if (v?.isEmpty ?? true) return 'Required';
                   if ((v?.length ?? 0) < 6) return 'Min 6 characters';
+                  if (!RegExp(r'[A-Z]').hasMatch(v!)) return 'Include at least 1 uppercase letter';
+                  if (!RegExp(r'[0-9]').hasMatch(v)) return 'Include at least 1 number';
                   return null;
                 },
               ),
@@ -760,7 +762,16 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                 child: ElevatedButton(
                   style: BaycelComponents.buttonPrimary,
                   onPressed: () {
-                    _saveUserName(nameController.text);
+                    final name = nameController.text.trim();
+                    if (name.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Name is required'), backgroundColor: BaycelColors.error));
+                      return;
+                    }
+                    if (name.length < 2) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Name must be at least 2 characters'), backgroundColor: BaycelColors.error));
+                      return;
+                    }
+                    _saveUserName(name);
                     setState(() => _isEditing = false);
                   },
                   child: Text('Save Name'),

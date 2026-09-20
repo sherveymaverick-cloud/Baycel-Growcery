@@ -474,6 +474,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       controller: _nameController,
       textCapitalization: TextCapitalization.words,
       style: BaycelTypography.body.copyWith(fontSize: 13),
+      maxLength: 100,
       decoration: _fieldDeco(
         hintText: 'Juan Dela Cruz',
         prefixIcon: Padding(
@@ -483,6 +484,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
       validator: (v) {
         if (v == null || v.trim().isEmpty) return 'Enter the employee\'s full name.';
+        if (v.trim().length < 2) return 'Name must be at least 2 characters';
         return null;
       },
     );
@@ -494,6 +496,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       keyboardType: TextInputType.emailAddress,
       textCapitalization: TextCapitalization.none,
       style: BaycelTypography.body.copyWith(fontSize: 13),
+      maxLength: 100,
       decoration: _fieldDeco(
         hintText: 'name@baycel.com',
         prefixIcon: Padding(
@@ -514,6 +517,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       controller: _passwordController,
       obscureText: _obscurePassword,
       style: BaycelTypography.body.copyWith(fontSize: 13),
+      maxLength: 128,
       onChanged: (_) => setState(() {}),
       decoration: _fieldDeco(
         hintText: 'At least 6 characters',
@@ -528,6 +532,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
       validator: (v) {
         if (v == null || v.length < 6) return 'Password must be at least 6 characters.';
+        if (!RegExp(r'[A-Z]').hasMatch(v)) return 'Include at least 1 uppercase letter.';
+        if (!RegExp(r'[0-9]').hasMatch(v)) return 'Include at least 1 number.';
         return null;
       },
     );
@@ -538,6 +544,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       controller: _confirmPasswordController,
       obscureText: _obscureConfirmPassword,
       style: BaycelTypography.body.copyWith(fontSize: 13),
+      maxLength: 128,
       decoration: _fieldDeco(
         hintText: 'Re-enter your password',
         prefixIcon: Padding(
@@ -628,6 +635,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       controller: _rateController,
       keyboardType: TextInputType.number,
       style: BaycelTypography.body.copyWith(fontSize: 13),
+      maxLength: 10,
       decoration: _fieldDeco(
         hintText: '0.00',
         prefixIcon: Padding(
@@ -682,13 +690,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final current = _parseTime(isStart ? _scheduleStart : _scheduleEnd);
     final picked = await showTimePicker(context: context, initialTime: current);
     if (picked != null) {
-      setState(() {
-        if (isStart) {
-          _scheduleStart = _formatTime(picked);
-        } else {
-          _scheduleEnd = _formatTime(picked);
+      final pickedTime = _formatTime(picked);
+      if (isStart) {
+        setState(() => _scheduleStart = pickedTime);
+      } else {
+        final startParts = _scheduleStart.split(':');
+        final endParts = pickedTime.split(':');
+        final startMin = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
+        final endMin = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+        if (endMin <= startMin) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('End time must be after start time'), backgroundColor: BaycelColors.error),
+          );
+          return;
         }
-      });
+        setState(() => _scheduleEnd = pickedTime);
+      }
     }
   }
 

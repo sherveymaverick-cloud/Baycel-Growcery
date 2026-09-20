@@ -15,6 +15,8 @@ class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  static const int _pageSize = 20;
+
   late final CollectionReference _users = _firestore.collection('users');
   late final CollectionReference _products = _firestore.collection('products');
   late final CollectionReference _stockMovements = _firestore.collection('stock_movements');
@@ -58,6 +60,12 @@ class FirestoreService {
         .toList());
   }
 
+  Stream<List<StoreUser>> getUsersPage() {
+    return _users.limit(_pageSize).snapshots().map((snapshot) => snapshot.docs
+        .map((doc) => StoreUser.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+        .toList());
+  }
+
   Future<void> updateUser(String uid, Map<String, dynamic> data) async {
     try {
       data['updatedAt'] = FieldValue.serverTimestamp();
@@ -94,6 +102,23 @@ class FirestoreService {
     return _products.snapshots().map((snapshot) => snapshot.docs
         .map((doc) => Product.fromMap(doc.id, doc.data() as Map<String, dynamic>))
         .toList());
+  }
+
+  Stream<List<Product>> getProductsPage() {
+    return _products.limit(_pageSize).snapshots().map((snapshot) => snapshot.docs
+        .map((doc) => Product.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+        .toList());
+  }
+
+  Stream<List<Product>> getProductsByCategory(String category) {
+    return _products
+        .where('category', isEqualTo: category)
+        .orderBy('name')
+        .limit(_pageSize)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => Product.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+            .toList());
   }
 
   Future<void> addProduct(Product product) async {
@@ -186,6 +211,7 @@ class FirestoreService {
   Stream<List<Delivery>> getDeliveries() {
     return _deliveries
         .orderBy('createdAt', descending: true)
+        .limit(_pageSize)
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => Delivery.fromMap(doc.id, doc.data() as Map<String, dynamic>))
@@ -222,6 +248,7 @@ class FirestoreService {
   Stream<List<AttendanceRecord>> getAttendance() {
     return _attendance
         .orderBy('date', descending: true)
+        .limit(_pageSize)
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => AttendanceRecord.fromMap(doc.id, doc.data() as Map<String, dynamic>))
@@ -373,5 +400,43 @@ class FirestoreService {
     } catch (e) {
       throw Exception('Failed to update cash advance. Please try again.');
     }
+  }
+
+  // ── Pagination Load More ──────────────────────────
+
+  Future<List<StoreUser>> loadMoreUsers(DocumentSnapshot lastDoc) async {
+    final snap = await _users.startAfterDocument(lastDoc).limit(_pageSize).get();
+    return snap.docs
+        .map((doc) => StoreUser.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<Product>> loadMoreProducts(DocumentSnapshot lastDoc) async {
+    final snap = await _products.startAfterDocument(lastDoc).limit(_pageSize).get();
+    return snap.docs
+        .map((doc) => Product.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<Delivery>> loadMoreDeliveries(DocumentSnapshot lastDoc) async {
+    final snap = await _deliveries
+        .orderBy('createdAt', descending: true)
+        .startAfterDocument(lastDoc)
+        .limit(_pageSize)
+        .get();
+    return snap.docs
+        .map((doc) => Delivery.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<AttendanceRecord>> loadMoreAttendance(DocumentSnapshot lastDoc) async {
+    final snap = await _attendance
+        .orderBy('date', descending: true)
+        .startAfterDocument(lastDoc)
+        .limit(_pageSize)
+        .get();
+    return snap.docs
+        .map((doc) => AttendanceRecord.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+        .toList();
   }
 }

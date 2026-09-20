@@ -18,12 +18,20 @@ class DeliveryScreen extends StatefulWidget {
 class _DeliveryScreenState extends State<DeliveryScreen> {
   DeliveryStatus? _selectedFilter;
   final _firestore = FirestoreService();
+  final _db = FirebaseFirestore.instance;
   String _userRole = '';
+
+  List<Delivery> _deliveries = [];
+  DocumentSnapshot? _lastDoc;
+  bool _hasMore = true;
+  bool _isLoading = true;
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
     super.initState();
     _detectRole();
+    _loadInitialDeliveries();
   }
 
   void _detectRole() async {
@@ -39,15 +47,35 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     }
   }
 
+  Future<void> _loadInitialDeliveries() async {
+    setState(() => _isLoading = true);
+    final snap = await _db.collection('deliveries').orderBy('createdAt', descending: true).limit(20).get();
+    _deliveries = snap.docs.map((d) => Delivery.fromMap(d.id, d.data())).toList();
+    _lastDoc = snap.docs.isNotEmpty ? snap.docs.last : null;
+    _hasMore = snap.docs.length >= 20;
+    setState(() => _isLoading = false);
+  }
+
+  Future<void> _loadMoreDeliveries() async {
+    if (_lastDoc == null || _isLoadingMore) return;
+    setState(() => _isLoadingMore = true);
+    final snap = await _db.collection('deliveries')
+        .orderBy('createdAt', descending: true)
+        .startAfterDocument(_lastDoc!)
+        .limit(20)
+        .get();
+    _deliveries.addAll(snap.docs.map((d) => Delivery.fromMap(d.id, d.data())).toList());
+    _lastDoc = snap.docs.isNotEmpty ? snap.docs.last : _lastDoc;
+    _hasMore = snap.docs.length >= 20;
+    setState(() => _isLoadingMore = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.all(BaycelSpacing.lg),
-      child: StreamBuilder<List<Delivery>>(
-        stream: _firestore.getDeliveries(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Column(
+      child: _isLoading
+          ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Deliveries', style: BaycelTypography.display),
@@ -56,26 +84,28 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 SizedBox(height: BaycelSpacing.lg),
                 const Expanded(child: Center(child: SkeletonTable(rows: 6))),
               ],
-            );
-          }
+            )
+          : _buildContent(),
+    );
+  }
 
-          final deliveries = snapshot.data ?? [];
-          final count = deliveries.length;
-          final filtered = _selectedFilter == null
-              ? deliveries
-              : deliveries.where((d) => d.status == _selectedFilter).toList();
-          final counts = {
-            null: deliveries.length,
-            DeliveryStatus.delivered: deliveries.where((d) => d.status == DeliveryStatus.delivered).length,
-            DeliveryStatus.pending: deliveries.where((d) => d.status == DeliveryStatus.pending || d.status == DeliveryStatus.inTransit).length,
-            DeliveryStatus.discrepancy: deliveries.where((d) => d.status == DeliveryStatus.discrepancy).length,
-          };
-          final filters = [
-            (label: 'All', status: null),
-            (label: 'Verified', status: DeliveryStatus.delivered),
-            (label: 'Pending', status: DeliveryStatus.pending),
-            (label: 'Discrepancy', status: DeliveryStatus.discrepancy),
-          ];
+  Widget _buildContent() {
+    final count = _deliveries.length;
+    final filtered = _selectedFilter == null
+        ? _deliveries
+        : _deliveries.where((d) => d.status == _selectedFilter).toList();
+    final counts = {
+      null: _deliveries.length,
+      DeliveryStatus.delivered: _deliveries.where((d) => d.status == DeliveryStatus.delivered).length,
+      DeliveryStatus.pending: _deliveries.where((d) => d.status == DeliveryStatus.pending || d.status == DeliveryStatus.inTransit).length,
+      DeliveryStatus.discrepancy: _deliveries.where((d) => d.status == DeliveryStatus.discrepancy).length,
+    };
+    final filters = [
+      (label: 'All', status: null),
+      (label: 'Verified', status: DeliveryStatus.delivered),
+      (label: 'Pending', status: DeliveryStatus.pending),
+      (label: 'Discrepancy', status: DeliveryStatus.discrepancy),
+    ];
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,11 +221,23 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                       ),
                 ),
               ),
+              if (_hasMore)
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: BaycelSpacing.base),
+                  child: Center(
+                    child: _isLoadingMore
+                        ? SizedBox(width: 20, height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: BaycelColors.crimson))
+                        : GestureDetector(
+                            onTap: _loadMoreDeliveries,
+                            child: Text('Load More',
+                              style: BaycelTypography.bodySm.copyWith(
+                                color: BaycelColors.crimson, fontWeight: FontWeight.w600)),
+                          ),
+                  ),
+                ),
             ],
           );
-        },
-      ),
-    );
   }
 
   Padding _buildTh(String text) {
