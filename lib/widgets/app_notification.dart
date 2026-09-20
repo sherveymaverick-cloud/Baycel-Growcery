@@ -136,6 +136,7 @@ class _NotificationBellState extends State<NotificationBell> {
           .collection('notifications')
           .where('userId', isEqualTo: uid)
           .where('read', isEqualTo: false)
+          .limit(99)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasData) {

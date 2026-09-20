@@ -558,9 +558,27 @@ class _DeductionEditorDialogState extends State<_DeductionEditorDialog> {
   void _addDeduction() {
     final desc = _descController.text.trim();
     final amount = double.tryParse(_amountController.text) ?? 0;
-    if (desc.isEmpty || amount <= 0) {
+    if (desc.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Enter description and valid amount')),
+        SnackBar(content: Text('Enter a description'), backgroundColor: BaycelColors.error),
+      );
+      return;
+    }
+    if (desc.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Description must be at least 2 characters'), backgroundColor: BaycelColors.error),
+      );
+      return;
+    }
+    if (_amountController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Enter an amount'), backgroundColor: BaycelColors.error),
+      );
+      return;
+    }
+    if (amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Amount must be greater than 0'), backgroundColor: BaycelColors.error),
       );
       return;
     }
@@ -642,6 +660,7 @@ class _DeductionEditorDialogState extends State<_DeductionEditorDialog> {
               controller: _descController,
               decoration: BaycelComponents.input.copyWith(hintText: 'Description (e.g., SSS, PhilHealth, Cash Advance)'),
               style: BaycelTypography.body.copyWith(fontSize: 13),
+              maxLength: 100,
             ),
             SizedBox(height: BaycelSpacing.sm),
             TextField(
@@ -649,6 +668,7 @@ class _DeductionEditorDialogState extends State<_DeductionEditorDialog> {
               keyboardType: TextInputType.numberWithOptions(decimal: true),
               decoration: BaycelComponents.input.copyWith(hintText: 'Amount'),
               style: BaycelTypography.body.copyWith(fontSize: 13),
+              maxLength: 10,
             ),
             SizedBox(height: BaycelSpacing.sm),
             SizedBox(

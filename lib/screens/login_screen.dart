@@ -210,6 +210,7 @@ class _LoginScreenState extends State<LoginScreen> {
       TextFormField(controller: _emailController, keyboardType: TextInputType.emailAddress,
         textCapitalization: TextCapitalization.none,
         style: BaycelTypography.body.copyWith(fontSize: 13),
+        maxLength: 100,
         decoration: InputDecoration(filled: true, fillColor: BaycelColors.card, hintText: 'name@baycel.com',
           hintStyle: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled, fontSize: 13),
           contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -230,6 +231,7 @@ class _LoginScreenState extends State<LoginScreen> {
       Stack(children: [
         TextFormField(controller: _passwordController, obscureText: _obscurePassword,
           keyboardType: TextInputType.visiblePassword, style: BaycelTypography.body.copyWith(fontSize: 13),
+          maxLength: 128,
           decoration: InputDecoration(filled: true, fillColor: BaycelColors.card, hintText: 'Enter your password',
             hintStyle: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled, fontSize: 13),
             contentPadding: EdgeInsets.fromLTRB(16, 14, 44, 14),
@@ -280,6 +282,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   controller: emailController,
                   keyboardType: TextInputType.emailAddress,
                   decoration: BaycelComponents.input.copyWith(hintText: 'Email address'),
+                  maxLength: 100,
                 ),
               ],
             ),
@@ -288,14 +291,24 @@ class _LoginScreenState extends State<LoginScreen> {
               ElevatedButton(
                 onPressed: () async {
                   final email = emailController.text.trim();
-                  if (email.isNotEmpty) {
-                    await AuthService().resetPassword(email);
-                    if (ctx.mounted) {
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Password reset email sent')),
-                      );
-                    }
+                  if (email.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Enter your email address'), backgroundColor: BaycelColors.error),
+                    );
+                    return;
+                  }
+                  if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Enter a valid email address'), backgroundColor: BaycelColors.error),
+                    );
+                    return;
+                  }
+                  await AuthService().resetPassword(email);
+                  if (ctx.mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Password reset email sent')),
+                    );
                   }
                 },
                 style: BaycelComponents.buttonPrimary,

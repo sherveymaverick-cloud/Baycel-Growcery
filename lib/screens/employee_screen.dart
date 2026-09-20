@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../theme.dart';
 import '../widgets/shared_widgets.dart';
 import '../widgets/animated_widgets.dart';
@@ -85,11 +86,20 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
   }
 
   final _firestore = FirestoreService();
+  final _db = FirebaseFirestore.instance;
+
+  List<StoreUser> _allUsers = [];
+  List<StoreUser> _displayedUsers = [];
+  DocumentSnapshot? _lastDoc;
+  bool _hasMore = true;
+  bool _isLoadingPage = true;
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
     super.initState();
     _loadCurrentUser();
+    _loadInitialUsers();
   }
 
   void _loadCurrentUser() async {
@@ -102,105 +112,117 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
     }
   }
 
-  Stream<List<StoreUser>> _usersStream() {
-    return _firestore.getUsers();
+  Future<void> _loadInitialUsers() async {
+    setState(() => _isLoadingPage = true);
+    final snap = await _db.collection('users').limit(20).get();
+    final users = snap.docs.map((d) => StoreUser.fromMap(d.id, d.data())).toList();
+    _lastDoc = snap.docs.isNotEmpty ? snap.docs.last : null;
+    _hasMore = snap.docs.length >= 20;
+    _applyFilters(users);
+    setState(() => _isLoadingPage = false);
+  }
+
+  Future<void> _loadMoreUsers() async {
+    if (_lastDoc == null || _isLoadingMore) return;
+    setState(() => _isLoadingMore = true);
+    final snap = await _db.collection('users').startAfterDocument(_lastDoc!).limit(20).get();
+    final more = snap.docs.map((d) => StoreUser.fromMap(d.id, d.data())).toList();
+    _allUsers.addAll(more);
+    _lastDoc = snap.docs.isNotEmpty ? snap.docs.last : _lastDoc;
+    _hasMore = snap.docs.length >= 20;
+    _applyFilters(_allUsers);
+    setState(() => _isLoadingMore = false);
+  }
+
+  void _applyFilters(List<StoreUser> users) {
+    List<StoreUser> filtered;
+    if (_currentUserRole == UserRole.owner) {
+      filtered = users.where((u) => u.role != UserRole.owner).toList();
+    } else if (_currentUserRole == UserRole.manager) {
+      filtered = users.where((u) =>
+        u.uid == _currentUserId ||
+        (u.role != UserRole.owner && u.role != UserRole.manager)
+      ).toList();
+    } else {
+      filtered = users.where((u) => u.role != UserRole.owner).toList();
+    }
+    if (_selectedRole != null) {
+      filtered = filtered.where((u) => u.role == _selectedRole).toList();
+    }
+    _displayedUsers = filtered;
   }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<StoreUser>>(
-      stream: _usersStream(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: SkeletonTable(rows: 6));
-        }
+    if (_isLoadingPage) {
+      return const Center(child: SkeletonTable(rows: 6));
+    }
 
-        final allUsers = snapshot.data ?? [];
-
-        List<StoreUser> filtered;
-        if (_currentUserRole == UserRole.owner) {
-          filtered = allUsers.where((u) => u.role != UserRole.owner).toList();
-        } else if (_currentUserRole == UserRole.manager) {
-          filtered = allUsers.where((u) =>
-            u.uid == _currentUserId ||
-            (u.role != UserRole.owner && u.role != UserRole.manager)
-          ).toList();
-        } else {
-          filtered = allUsers.where((u) => u.role != UserRole.owner).toList();
-        }
-
-        if (_selectedRole != null) {
-          filtered = filtered.where((u) => u.role == _selectedRole).toList();
-        }
-
-        return SingleChildScrollView(
-          padding: EdgeInsets.all(BaycelSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              SizedBox(height: BaycelSpacing.lg),
-              _buildFilterChips(),
-              SizedBox(height: BaycelSpacing.lg),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  int columns;
-                  if (constraints.maxWidth > 1024) {
-                    columns = 3;
-                  } else if (constraints.maxWidth > 600) {
-                    columns = 2;
-                  } else {
-                    columns = 1;
-                  }
-                  return _buildGrid(filtered, columns);
-                },
-              ),
-            ],
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(BaycelSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildHeader(),
+          SizedBox(height: BaycelSpacing.lg),
+          _buildFilterChips(),
+          SizedBox(height: BaycelSpacing.lg),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              int columns;
+              if (constraints.maxWidth > 1024) {
+                columns = 3;
+              } else if (constraints.maxWidth > 600) {
+                columns = 2;
+              } else {
+                columns = 1;
+              }
+              return _buildGrid(_displayedUsers, columns);
+            },
           ),
-        );
-      },
+          if (_hasMore)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: BaycelSpacing.base),
+              child: Center(
+                child: _isLoadingMore
+                    ? SizedBox(width: 20, height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: BaycelColors.crimson))
+                    : GestureDetector(
+                        onTap: _loadMoreUsers,
+                        child: Text('Load More',
+                          style: BaycelTypography.bodySm.copyWith(
+                            color: BaycelColors.crimson, fontWeight: FontWeight.w600)),
+                      ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
   Widget _buildHeader() {
-    return StreamBuilder<List<StoreUser>>(
-      stream: _usersStream(),
-      builder: (context, snapshot) {
-        final allUsers = snapshot.data ?? [];
-        int count;
-        if (_currentUserRole == UserRole.owner) {
-          count = allUsers.where((u) => u.role != UserRole.owner).length;
-        } else if (_currentUserRole == UserRole.manager) {
-          count = allUsers.where((u) =>
-            u.uid == _currentUserId ||
-            (u.role != UserRole.owner && u.role != UserRole.manager)
-          ).length;
-        } else {
-          count = allUsers.where((u) => u.role != UserRole.owner).length;
-        }
-        final canAdd = _currentUserRole == UserRole.owner || _currentUserRole == UserRole.manager;
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    final count = _displayedUsers.length;
+    final canAdd = _currentUserRole == UserRole.owner || _currentUserRole == UserRole.manager;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Employees', style: BaycelTypography.display),
-                SizedBox(height: BaycelSpacing.xxs),
-                Text('$count team members',
-                  style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary, fontSize: 12.5)),
-              ],
-            ),
-            if (canAdd)
-              ElevatedButton.icon(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
-                icon: const Icon(Icons.person_add, size: 18),
-                label: const Text('Add Employee'),
-                style: BaycelComponents.buttonPrimary,
-              ),
+            Text('Employees', style: BaycelTypography.display),
+            SizedBox(height: BaycelSpacing.xxs),
+            Text('$count team members',
+              style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary, fontSize: 12.5)),
           ],
-        );
-      },
+        ),
+        if (canAdd)
+          ElevatedButton.icon(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
+            icon: const Icon(Icons.person_add, size: 18),
+            label: const Text('Add Employee'),
+            style: BaycelComponents.buttonPrimary,
+          ),
+      ],
     );
   }
 
@@ -214,7 +236,11 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
         return ChoiceChip(
           label: Text(_filterLabels[index]),
           selected: selected,
-          onSelected: (_) => setState(() => _selectedRole = role),
+          onSelected: (_) {
+            setState(() => _selectedRole = role);
+            _applyFilters(_allUsers);
+            setState(() {});
+          },
           selectedColor: BaycelColors.crimson,
           backgroundColor: BaycelColors.card,
           labelStyle: BaycelTypography.labelSm.copyWith(
@@ -438,10 +464,31 @@ class _EmployeeCard extends StatelessWidget {
                   children: [
                     _sectionTitle('Account'),
                     _label('Name'),
-                    TextField(controller: nameController, style: BaycelTypography.body.copyWith(fontSize: 13), decoration: _fieldDeco('Full name')),
+                    TextFormField(
+                      controller: nameController,
+                      style: BaycelTypography.body.copyWith(fontSize: 13),
+                      decoration: _fieldDeco('Full name'),
+                      maxLength: 100,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Name is required';
+                        if (v.trim().length < 2) return 'Name must be at least 2 characters';
+                        return null;
+                      },
+                    ),
                     SizedBox(height: BaycelSpacing.sm),
                     _label('Email'),
-                    TextField(controller: emailController, style: BaycelTypography.body.copyWith(fontSize: 13), decoration: _fieldDeco('Email address'), keyboardType: TextInputType.emailAddress),
+                    TextFormField(
+                      controller: emailController,
+                      style: BaycelTypography.body.copyWith(fontSize: 13),
+                      decoration: _fieldDeco('Email address'),
+                      keyboardType: TextInputType.emailAddress,
+                      maxLength: 100,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Email is required';
+                        if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(v.trim())) return 'Enter a valid email';
+                        return null;
+                      },
+                    ),
                     SizedBox(height: BaycelSpacing.sm),
                     _label('Role'),
                     Container(
@@ -527,11 +574,13 @@ class _EmployeeCard extends StatelessWidget {
                           style: BaycelTypography.body.copyWith(fontSize: 13),
                           decoration: _fieldDeco('e.g. 75'),
                           keyboardType: TextInputType.number,
+                          maxLength: 10,
                           onChanged: (v) => setDialogState(() {}),
                           validator: (v) {
                             if (v == null || v.isEmpty) return null;
                             final rate = double.tryParse(v);
                             if (rate == null) return 'Enter a valid number';
+                            if (rate <= 0) return 'Rate must be greater than 0';
                             if (rate > 1000) return 'Max ₱1,000/hr lang po';
                             return null;
                           },
@@ -631,6 +680,18 @@ class _EmployeeCard extends StatelessWidget {
             ElevatedButton(
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
+                if (scheduleStart.isNotEmpty && scheduleEnd.isNotEmpty) {
+                  final startParts = scheduleStart.split(':');
+                  final endParts = scheduleEnd.split(':');
+                  final startMin = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
+                  final endMin = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+                  if (endMin <= startMin) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(content: Text('End time must be after start time'), backgroundColor: BaycelColors.error),
+                    );
+                    return;
+                  }
+                }
                 final rate = double.tryParse(rateController.text) ?? 0;
                 try {
                   await firestore.updateUser(user.uid, {
