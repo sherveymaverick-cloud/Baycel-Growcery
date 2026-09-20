@@ -15,8 +15,7 @@ import 'attendance_screen.dart';
 import 'employee_screen.dart';
 import 'payroll_screen.dart';
 import 'reports_screen.dart';
-import 'settings_screen.dart';
-import 'profile_screen.dart';
+import 'profile_settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -108,22 +107,23 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'owner':
         return [
           NavigationItem(icon: Icons.dashboard, label: 'Dashboard', page: const OwnerDashboard()),
-          NavigationItem(icon: Icons.inventory_2, label: 'Inventory', page: const InventoryScreen()),
+          NavigationItem(icon: Icons.inventory_2, label: 'Inventory', page: InventoryScreen(role: 'owner')),
           NavigationItem(icon: Icons.local_shipping, label: 'Deliveries', page: const DeliveryScreen()),
           NavigationItem(icon: Icons.access_time, label: 'Attendance', page: const AttendanceScreen()),
           NavigationItem(icon: Icons.people, label: 'Employees', page: const EmployeeScreen()),
           NavigationItem(icon: Icons.payments, label: 'Payroll', page: const PayrollScreen()),
           NavigationItem(icon: Icons.assessment, label: 'Reports', page: const ReportsScreen()),
-          NavigationItem(icon: Icons.settings, label: 'Settings', page: const SettingsScreen()),
+          NavigationItem(icon: Icons.person, label: 'Profile', page: const ProfileSettingsScreen()),
         ];
       case 'manager':
         return [
           NavigationItem(icon: Icons.dashboard, label: 'Dashboard', page: const ManagerDashboard()),
-          NavigationItem(icon: Icons.inventory_2, label: 'Inventory', page: const InventoryScreen()),
+          NavigationItem(icon: Icons.inventory_2, label: 'Inventory', page: InventoryScreen(role: 'manager')),
           NavigationItem(icon: Icons.local_shipping, label: 'Deliveries', page: const DeliveryScreen()),
           NavigationItem(icon: Icons.access_time, label: 'Attendance', page: const AttendanceScreen()),
           NavigationItem(icon: Icons.people, label: 'Employees', page: const EmployeeScreen()),
           NavigationItem(icon: Icons.assessment, label: 'Reports', page: const ReportsScreen()),
+          NavigationItem(icon: Icons.person, label: 'Profile', page: const ProfileSettingsScreen()),
         ];
       default:
         final cacheKey = 'floor_$role'.hashCode;
@@ -132,11 +132,10 @@ class _HomeScreenState extends State<HomeScreen> {
         final items = [
           NavigationItem(icon: Icons.home, label: 'Home', page: dashboard),
           NavigationItem(icon: Icons.access_time, label: 'Attendance', page: const AttendanceScreen()),
-          NavigationItem(icon: Icons.person, label: 'Profile', page: const ProfileScreen()),
-          NavigationItem(icon: Icons.settings, label: 'Settings', page: const SettingsScreen()),
+          NavigationItem(icon: Icons.person, label: 'Profile', page: const ProfileSettingsScreen()),
         ];
         if (role == 'delivery_checker' || role == 'merchandiser' || role == 'bodegero') {
-          items.insert(1, NavigationItem(icon: Icons.inventory_2, label: 'Inventory', page: const InventoryScreen()));
+          items.insert(1, NavigationItem(icon: Icons.inventory_2, label: 'Inventory', page: InventoryScreen(role: role)));
         }
         if (role == 'delivery_checker' || role == 'bodegero') {
           items.insert(2, NavigationItem(icon: Icons.local_shipping, label: 'Deliveries', page: const DeliveryScreen()));
@@ -345,43 +344,48 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(BaycelRadius.lg),
         boxShadow: [const BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.04), blurRadius: 2, offset: Offset(0, 1))],
       ),
-      child: Row(
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          Expanded(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 360),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-              decoration: BoxDecoration(
-                color: BaycelColors.surface,
-                borderRadius: BorderRadius.circular(BaycelRadius.md),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.search, size: 16, color: BaycelColors.textDisabled),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      focusNode: _searchFocusNode,
-                      style: BaycelTypography.body.copyWith(fontSize: 13),
-                      decoration: InputDecoration(
-                        hintText: 'Search products, employees, suppliers\u2026',
-                        hintStyle: BaycelTypography.body.copyWith(color: BaycelColors.textDisabled, fontSize: 13),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      onSubmitted: (query) => _handleSearch(query),
-                    ),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 360),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: BaycelColors.surface,
+                    borderRadius: BorderRadius.circular(BaycelRadius.md),
                   ),
-                ],
+                  child: Row(
+                    children: [
+                      Icon(Icons.search, size: 16, color: BaycelColors.textDisabled),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          focusNode: _searchFocusNode,
+                          style: BaycelTypography.body.copyWith(fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText: 'Search products, employees, suppliers\u2026',
+                            hintStyle: BaycelTypography.body.copyWith(color: BaycelColors.textDisabled, fontSize: 13),
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          onSubmitted: (query) => _handleSearch(query),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+              SizedBox(width: 16),
+              Text(dateStr, style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 12)),
+              SizedBox(width: 12),
+              NotificationBell(),
+            ],
           ),
-          SizedBox(width: 16),
-          Text(dateStr, style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 12)),
-          SizedBox(width: 16),
-          NotificationBell(),
         ],
       ),
     );
@@ -422,7 +426,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'analytics': 6,
       'chart': 6,
       'setting': 7,
-      'profile': 8,
+      'profile': 7,
     };
 
     for (final entry in keywords.entries) {
@@ -493,9 +497,8 @@ class _TopbarIconBtn extends StatefulWidget {
   final IconData icon;
   final bool hasBadge;
   final VoidCallback onTap;
-  final String? tooltip;
 
-  const _TopbarIconBtn({required this.icon, required this.hasBadge, required this.onTap, this.tooltip});
+  const _TopbarIconBtn({required this.icon, required this.hasBadge, required this.onTap});
 
   @override
   State<_TopbarIconBtn> createState() => _TopbarIconBtnState();

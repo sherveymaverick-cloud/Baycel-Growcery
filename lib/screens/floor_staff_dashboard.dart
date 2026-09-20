@@ -460,6 +460,7 @@ class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
           cashAdvancesStream: _firestore.getCashAdvancesByUser(FirebaseAuth.instance.currentUser?.uid ?? ''),
           onConfirmDelivery: _handleConfirmDelivery,
           onStockOut: _handleStockOut,
+          onCreateDelivery: _handleDeliveryCreation,
         ),
       ];
       case 'delivery_checker': return [
@@ -480,7 +481,7 @@ class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
           productsStream: _firestore.getProducts(),
           stockMovementsStream: _firestore.getStockMovements(),
           onStockOut: _handleStockOut,
-          cashAdvancesStream: _firestore.getCashAdvancesByUser(FirebaseAuth.instance.currentUser?.uid ?? ''),
+          onSubmitAbsence: _handleAbsenceSubmission,
         ),
       ];
       default: return [

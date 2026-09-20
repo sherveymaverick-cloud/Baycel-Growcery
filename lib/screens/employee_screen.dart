@@ -3,6 +3,7 @@ import '../theme.dart';
 import '../widgets/shared_widgets.dart';
 import '../widgets/animated_widgets.dart';
 import '../models/user.dart';
+import '../models/product.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
 import 'register_screen.dart';
@@ -368,6 +369,7 @@ class _EmployeeCard extends StatelessWidget {
     UserRole selectedRole = [UserRole.manager, UserRole.cashier, UserRole.bagger, UserRole.bodegero, UserRole.deliveryChecker, UserRole.merchandiser].contains(user.role) ? user.role : UserRole.cashier;
     String scheduleStart = user.schedule.start;
     String scheduleEnd = user.schedule.end;
+    List<String> selectedProducts = List.from(user.assignedProducts);
     final firestore = FirestoreService();
     final formKey = GlobalKey<FormState>();
 
@@ -420,24 +422,6 @@ class _EmployeeCard extends StatelessWidget {
       );
     }
 
-    InputDecoration _fieldDeco(String hint) => BaycelComponents.input.copyWith(
-      hintText: hint,
-      filled: true,
-      fillColor: BaycelColors.card,
-      contentPadding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: 10),
-    );
-
-    Widget _label(String text) => Padding(
-      padding: EdgeInsets.only(bottom: BaycelSpacing.xxs),
-      child: Text(text, style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textSecondary, fontSize: 11)),
-    );
-
-    Widget _sectionTitle(String text) => Padding(
-      padding: EdgeInsets.only(top: BaycelSpacing.md, bottom: BaycelSpacing.xs),
-      child: Text(text, style: BaycelTypography.labelSm.copyWith(
-        color: BaycelColors.textMuted, fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.05)),
-    );
-
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -481,41 +465,98 @@ class _EmployeeCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    _sectionTitle('Employment'),
-                    _label('Hourly Rate (₱)'),
-                    TextFormField(
-                      controller: rateController,
-                      style: BaycelTypography.body.copyWith(fontSize: 13),
-                      decoration: _fieldDeco('e.g. 75'),
-                      keyboardType: TextInputType.number,
-                      onChanged: (v) => setDialogState(() {}),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return null;
-                        final rate = double.tryParse(v);
-                        if (rate == null) return 'Enter a valid number';
-                        if (rate > 1000) return 'Max ₱1,000/hr lang po';
-                        return null;
-                      },
-                    ),
-                    SizedBox(height: BaycelSpacing.sm),
-                    _label('Payday'),
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base),
-                      decoration: BoxDecoration(color: BaycelColors.card, border: Border.all(color: BaycelColors.divider), borderRadius: BorderRadius.circular(BaycelRadius.md)),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<int>(
-                          value: selectedPayday,
-                          isExpanded: true,
-                          style: BaycelTypography.body.copyWith(fontSize: 13),
-                          dropdownColor: BaycelColors.card,
-                          items: const [
-                            DropdownMenuItem(value: 7, child: Text('Every 7th')),
-                            DropdownMenuItem(value: 15, child: Text('Every 15th')),
-                          ],
-                          onChanged: (v) => setDialogState(() => selectedPayday = v ?? 7),
+                    if (user.role != UserRole.owner) ...[
+                      if (selectedRole == UserRole.merchandiser) ...[
+                        _sectionTitle('Product Assignment'),
+                        _label('Select assigned products'),
+                        StreamBuilder<List<Product>>(
+                          stream: firestore.getProducts(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return CircularProgressIndicator(color: BaycelColors.crimson);
+                            }
+                            final products = snapshot.data ?? [];
+                            if (products.isEmpty) {
+                              return Text('No products available', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled));
+                            }
+                            return ConstrainedBox(
+                              constraints: BoxConstraints(maxHeight: 200),
+                              child: Container(
+                                padding: EdgeInsets.all(BaycelSpacing.sm),
+                                decoration: BoxDecoration(
+                                  color: BaycelColors.surface,
+                                  borderRadius: BorderRadius.circular(BaycelRadius.md),
+                                  border: Border.all(color: BaycelColors.divider),
+                                ),
+                                child: ListView.builder(
+                                  shrinkWrap: true,
+                                  itemCount: products.length,
+                                  itemBuilder: (context, index) {
+                                    final product = products[index];
+                                    final isSelected = selectedProducts.contains(product.id);
+                                    return CheckboxListTile(
+                                      value: isSelected,
+                                      onChanged: (v) {
+                                        setDialogState(() {
+                                          if (v == true) {
+                                            selectedProducts.add(product.id);
+                                          } else {
+                                            selectedProducts.remove(product.id);
+                                          }
+                                        });
+                                      },
+                                      title: Text(product.name, style: BaycelTypography.bodySm.copyWith(fontSize: 12.5)),
+                                      activeColor: BaycelColors.crimson,
+                                      contentPadding: EdgeInsets.zero,
+                                      dense: true,
+                                    );
+                                  },
+                                ),
+                              ),
+                            );
+                          },
                         ),
-                      ),
-                    ),
+                        SizedBox(height: BaycelSpacing.xs),
+                        Text('${selectedProducts.length} products selected',
+                          style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
+                      ] else ...[
+                        _sectionTitle('Employment'),
+                        _label('Hourly Rate (₱)'),
+                        TextFormField(
+                          controller: rateController,
+                          style: BaycelTypography.body.copyWith(fontSize: 13),
+                          decoration: _fieldDeco('e.g. 75'),
+                          keyboardType: TextInputType.number,
+                          onChanged: (v) => setDialogState(() {}),
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return null;
+                            final rate = double.tryParse(v);
+                            if (rate == null) return 'Enter a valid number';
+                            if (rate > 1000) return 'Max ₱1,000/hr lang po';
+                            return null;
+                          },
+                        ),
+                        SizedBox(height: BaycelSpacing.sm),
+                        _label('Payday'),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base),
+                          decoration: BoxDecoration(color: BaycelColors.card, border: Border.all(color: BaycelColors.divider), borderRadius: BorderRadius.circular(BaycelRadius.md)),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<int>(
+                              value: selectedPayday,
+                              isExpanded: true,
+                              style: BaycelTypography.body.copyWith(fontSize: 13),
+                              dropdownColor: BaycelColors.card,
+                              items: const [
+                                DropdownMenuItem(value: 7, child: Text('Every 7th')),
+                                DropdownMenuItem(value: 15, child: Text('Every 15th')),
+                              ],
+                              onChanged: (v) => setDialogState(() => selectedPayday = v ?? 7),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                     _sectionTitle('Schedule'),
                     Row(
                       children: [
@@ -599,6 +640,7 @@ class _EmployeeCard extends StatelessWidget {
                     'rate': rate,
                     'payday': selectedPayday,
                     'schedule': {'start': scheduleStart, 'end': scheduleEnd},
+                    'assignedProducts': selectedRole == UserRole.merchandiser ? selectedProducts : [],
                   });
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (ctx.mounted) {

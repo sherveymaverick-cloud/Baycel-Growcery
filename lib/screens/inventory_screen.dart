@@ -6,7 +6,8 @@ import '../services/firestore_service.dart';
 import '../models/product.dart';
 
 class InventoryScreen extends StatefulWidget {
-  const InventoryScreen({super.key});
+  final String? role;
+  const InventoryScreen({super.key, this.role});
 
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
@@ -88,12 +89,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
             ),
             SizedBox(width: BaycelSpacing.md),
-            ElevatedButton.icon(
-              style: BaycelComponents.buttonPrimary,
-              onPressed: _showAddProductDialog,
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Add Product'),
-            ),
+            if (widget.role == 'owner' || widget.role == 'manager')
+              ElevatedButton.icon(
+                style: BaycelComponents.buttonPrimary,
+                onPressed: _showAddProductDialog,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add Product'),
+              ),
           ],
         );
       },

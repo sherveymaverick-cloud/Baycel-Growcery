@@ -13,6 +13,7 @@ import '../models/cash_advance.dart';
 import '../models/stock_movement.dart';
 import 'inventory_screen.dart';
 import 'delivery_screen.dart';
+import 'payroll_screen.dart';
 import 'floor_staff/delivery_scanner_screen.dart';
 
 class OwnerDashboard extends StatefulWidget {
@@ -111,6 +112,8 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           SizedBox(height: BaycelSpacing.lg),
           KeyedSubtree(key: _statsKey, child: _buildStatGrid()),
           SizedBox(height: BaycelSpacing.lg),
+          _buildPayrollSection(),
+          SizedBox(height: BaycelSpacing.lg),
           KeyedSubtree(key: _absencesKey, child: _buildAbsenceForms()),
           SizedBox(height: BaycelSpacing.lg),
           KeyedSubtree(key: _cashAdvanceKey, child: _buildCashAdvanceApprovals()),
@@ -178,6 +181,50 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Close')),
         ],
       ),
+    );
+  }
+
+  Widget _buildPayrollSection() {
+    return StreamBuilder<List<StoreUser>>(
+      stream: _firestore.getUsers(),
+      builder: (context, snapshot) {
+        final users = snapshot.data ?? [];
+        final employees = users.where((u) => u.role != UserRole.owner).toList();
+        return Container(
+          padding: EdgeInsets.all(BaycelSpacing.base),
+          decoration: BaycelComponents.card,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Payroll', style: BaycelTypography.headlineMd),
+                  SizedBox(
+                    height: 30,
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PayrollScreen())),
+                      icon: Icon(Icons.open_in_new, size: 14, color: Colors.white),
+                      label: Text('Manage', style: BaycelTypography.labelSm.copyWith(color: Colors.white, fontSize: 11)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: BaycelColors.crimson,
+                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BaycelRadius.md)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: BaycelSpacing.sm),
+              Text('${employees.length} employees on payroll',
+                style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary, fontSize: 12.5)),
+              SizedBox(height: BaycelSpacing.xs),
+              Text('Paydays: 7th & 15th of each month',
+                style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 11.5)),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -400,6 +447,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
     }
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           margin: EdgeInsets.only(bottom: BaycelSpacing.sm),
@@ -1165,10 +1213,9 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                 ],
               ),
               SizedBox(height: BaycelSpacing.base),
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: entries.map((e) {
                       final pct = maxVal > 0 ? e.value / maxVal : 0.0;
@@ -1206,7 +1253,6 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                     }).toList(),
                   ),
                 ),
-              ),
             ],
           ),
         );
@@ -1238,34 +1284,30 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                 style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted)),
               SizedBox(height: BaycelSpacing.base),
               if (catCount.isEmpty)
-                Expanded(
-                  child: Center(
-                    child: Text('No data', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)),
-                  ),
+                Center(
+                  child: Text('No data', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)),
                 )
               else
-                Expanded(
-                  child: Column(
-                    children: [
-                      ...catCount.entries.toList().asMap().entries.map((e) {
-                        final name = e.value.key;
-                        final count = e.value.value;
-                        final color = colors[e.key % colors.length];
-                        final pct = total > 0 ? (count / total * 100).round() : 0;
-                        return Padding(
-                          padding: EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            children: [
-                              Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-                              SizedBox(width: BaycelSpacing.sm),
-                              Expanded(child: Text(name, style: BaycelTypography.bodySm)),
-                              Text('$pct%', style: BaycelTypography.bodySm.copyWith(fontWeight: FontWeight.w500)),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
+                Column(
+                  children: [
+                    ...catCount.entries.toList().asMap().entries.map((e) {
+                      final name = e.value.key;
+                      final count = e.value.value;
+                      final color = colors[e.key % colors.length];
+                      final pct = total > 0 ? (count / total * 100).round() : 0;
+                      return Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                            SizedBox(width: BaycelSpacing.sm),
+                            Expanded(child: Text(name, style: BaycelTypography.bodySm)),
+                            Text('$pct%', style: BaycelTypography.bodySm.copyWith(fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
                 ),
             ],
           ),
@@ -1319,18 +1361,17 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                 children: [
                   Text('Top Products This Week', style: BaycelTypography.headlineMd),
                   GestureDetector(
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryScreen())),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => InventoryScreen(role: 'owner'))),
                     child: Text('View all', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.crimson, fontWeight: FontWeight.w600)),
                   ),
                 ],
               ),
               SizedBox(height: BaycelSpacing.sm),
               if (top.isEmpty)
-                Expanded(child: Center(child: Text('No products', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled))))
+                Center(child: Text('No products', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)))
               else
-                Expanded(
-                  child: Column(
-                    children: top.asMap().entries.map((e) {
+                Column(
+                  children: top.asMap().entries.map((e) {
                       final p = e.value;
                       final revenue = p.stockQuantity * p.price;
                       return StaggeredItem(
@@ -1345,7 +1386,6 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                       );
                     }).toList(),
                   ),
-                ),
             ],
           ),
         );
@@ -1378,19 +1418,18 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
               ),
               SizedBox(height: BaycelSpacing.sm),
               if (recent.isEmpty)
-                Expanded(child: Center(child: Padding(
+                Center(child: Padding(
                   padding: EdgeInsets.all(BaycelSpacing.xl),
                   child: Text('No deliveries yet', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)),
-                )))
+                ))
               else
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: SizedBox(
-                          width: constraints.maxWidth,
-                          child: Table(
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SizedBox(
+                        width: constraints.maxWidth,
+                        child: Table(
                             columnWidths: {
                               0: FlexColumnWidth(3),
                               1: FlexColumnWidth(2),
@@ -1411,7 +1450,6 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                       );
                     },
                   ),
-                ),
             ],
           ),
         );

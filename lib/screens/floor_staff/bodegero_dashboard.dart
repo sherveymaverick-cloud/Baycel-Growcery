@@ -22,6 +22,7 @@ class BodegeroDashboard extends StatefulWidget {
   final Stream<List<CashAdvance>> cashAdvancesStream;
   final void Function(String deliveryId) onConfirmDelivery;
   final void Function(String productName, int quantity) onStockOut;
+  final void Function(String supplier, List<Map<String, String>> items) onCreateDelivery;
 
   const BodegeroDashboard({
     super.key,
@@ -34,20 +35,40 @@ class BodegeroDashboard extends StatefulWidget {
     required this.cashAdvancesStream,
     required this.onConfirmDelivery,
     required this.onStockOut,
+    required this.onCreateDelivery,
   });
 
   @override
   State<BodegeroDashboard> createState() => _BodegeroDashboardState();
 }
 
-class _BodegeroDashboardState extends State<BodegeroDashboard> {
+class _BodegeroDashboardState extends State<BodegeroDashboard> with SingleTickerProviderStateMixin {
   final List<Map<String, String>> _scannedItems = [];
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        _BodegeroSummaryCard(firestore: widget.firestore),
+        _RecentTransfersCard(stockMovementsStream: widget.stockMovementsStream),
+        SizedBox(height: BaycelSpacing.md),
+        _LowStockNotificationCard(
+          productsStream: widget.productsStream,
+          onProductTap: (productName) {},
+        ),
         SizedBox(height: BaycelSpacing.md),
         _buildScannerSection(),
         SizedBox(height: BaycelSpacing.md),
@@ -55,14 +76,7 @@ class _BodegeroDashboardState extends State<BodegeroDashboard> {
         SizedBox(height: BaycelSpacing.md),
         _AbsenceRequestsCard(firestore: widget.firestore),
         SizedBox(height: BaycelSpacing.md),
-        StockLevelsCard(
-          productsStream: widget.productsStream,
-          onProductTap: (productName) => _showStockOutDialog(context, productName),
-        ),
-        SizedBox(height: BaycelSpacing.md),
-        _PendingDeliveryCard(firestore: widget.firestore, onConfirmDelivery: widget.onConfirmDelivery),
-        SizedBox(height: BaycelSpacing.md),
-        StockOutCard(productsStream: widget.productsStream, onSubmit: widget.onStockOut),
+        _buildDeliveryManagement(),
         SizedBox(height: BaycelSpacing.md),
         CashAdvanceCard(onSubmit: (amount, reason) async {
           try {
@@ -86,8 +100,6 @@ class _BodegeroDashboardState extends State<BodegeroDashboard> {
         }),
         SizedBox(height: BaycelSpacing.md),
         MyRequestsCard(requestsStream: widget.cashAdvancesStream),
-        SizedBox(height: BaycelSpacing.md),
-        _RecentTransfersCard(stockMovementsStream: widget.stockMovementsStream),
       ],
     );
   }
@@ -203,41 +215,72 @@ class _BodegeroDashboardState extends State<BodegeroDashboard> {
   }
 
   void _scanBarcode() {
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Barcode Scanner'),
-        content: Text('Point camera at product barcode to add to stock-out list.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Close')),
-        ],
+      isScrollControlled: true,
+      builder: (ctx) => BarcodeScannerSheet(
+        onScanned: (code) async {
+          Navigator.pop(ctx);
+          final product = await widget.firestore.getProductByBarcode(code);
+          if (product != null) {
+            setState(() {
+              final existing = _scannedItems.indexWhere((i) => i['name']!.toLowerCase() == product.name.toLowerCase());
+              if (existing >= 0) {
+                final currentQty = int.tryParse(_scannedItems[existing]['qty']!) ?? 0;
+                _scannedItems[existing]['qty'] = (currentQty + 1).toString();
+              } else {
+                _scannedItems.add({'name': product.name, 'qty': '1'});
+              }
+            });
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('${product.name} added')),
+            );
+          } else {
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('No product found for: $code'), backgroundColor: BaycelColors.marigoldDark),
+            );
+          }
+        },
       ),
     );
   }
 
-  void _showStockOutDialog(BuildContext context, String productName) {
-    final qtyController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Stock Out: $productName'),
-        content: TextField(
-          controller: qtyController,
-          keyboardType: TextInputType.number,
-          decoration: BaycelComponents.input.copyWith(hintText: 'Quantity'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              final qty = int.tryParse(qtyController.text) ?? 0;
-              if (qty > 0) {
-                widget.onStockOut(productName, qty);
-              }
-              Navigator.pop(ctx);
-            },
-            style: BaycelComponents.buttonPrimary,
-            child: Text('Confirm', style: TextStyle(color: Colors.white)),
+  Widget _buildDeliveryManagement() {
+    return Container(
+      decoration: BoxDecoration(
+        color: BaycelColors.card,
+        borderRadius: BorderRadius.circular(BaycelRadius.lg),
+        border: Border.all(color: BaycelColors.divider.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        children: [
+          TabBar(
+            controller: _tabController,
+            labelColor: BaycelColors.crimson,
+            unselectedLabelColor: BaycelColors.textMuted,
+            indicatorColor: BaycelColors.crimson,
+            indicatorSize: TabBarIndicatorSize.label,
+            labelStyle: BaycelTypography.label.copyWith(fontSize: 12.5),
+            unselectedLabelStyle: BaycelTypography.label.copyWith(fontSize: 12.5),
+            tabs: const [
+              Tab(text: 'Create Delivery'),
+              Tab(text: 'Verify Deliveries'),
+            ],
+          ),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.5),
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                CreateDeliveryCard(
+                  firestore: widget.firestore,
+                  onSubmit: widget.onCreateDelivery,
+                ),
+                VerifyDeliveriesCard(
+                  firestore: widget.firestore,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -275,174 +318,6 @@ class _BodegeroActionCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _BodegeroSummaryCard extends StatelessWidget {
-  final FirestoreService firestore;
-
-  const _BodegeroSummaryCard({required this.firestore});
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<List<Delivery>>(
-      stream: firestore.getDeliveries(),
-      builder: (context, deliverySnap) {
-        final deliveries = deliverySnap.data ?? [];
-        final pending = deliveries.where((d) =>
-          d.status == DeliveryStatus.pending || d.status == DeliveryStatus.inTransit).toList();
-        final pendingName = pending.isNotEmpty ? pending.first.supplierName : '';
-
-        return StreamBuilder<List<StockMovement>>(
-          stream: firestore.getStockMovements(),
-          builder: (context, movementSnap) {
-            final movements = movementSnap.data ?? [];
-            final today = DateTime.now();
-            final todayTransfers = movements.where((m) =>
-              m.createdAt.year == today.year && m.createdAt.month == today.month && m.createdAt.day == today.day).length;
-
-            return Container(
-              padding: EdgeInsets.all(BaycelSpacing.base),
-              decoration: BaycelComponents.card,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Today's Summary", style: BaycelTypography.title),
-                  SizedBox(height: BaycelSpacing.sm),
-                  if (pending.isNotEmpty)
-                    buildSummaryRow(
-                      Icons.local_shipping_outlined,
-                      '${pending.length} delivery awaiting stock-in',
-                      pendingName,
-                      pillLabel: 'Pending',
-                      pillColor: BaycelColors.marigoldDark,
-                    ),
-                  if (todayTransfers > 0)
-                    buildSummaryRow(
-                      Icons.swap_horiz,
-                      '$todayTransfers transfer logged today',
-                      '',
-                    ),
-                  if (pending.isEmpty && todayTransfers == 0)
-                    Center(child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: BaycelSpacing.lg),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.local_shipping_outlined, size: 32, color: BaycelColors.textDisabled),
-                          SizedBox(height: BaycelSpacing.sm),
-                          Text('No pending deliveries or transfers', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)),
-                        ],
-                      ),
-                    )),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-}
-
-class _PendingDeliveryCard extends StatelessWidget {
-  final FirestoreService firestore;
-  final void Function(String deliveryId) onConfirmDelivery;
-
-  const _PendingDeliveryCard({required this.firestore, required this.onConfirmDelivery});
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<List<Delivery>>(
-      stream: firestore.getDeliveries(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Container(
-            padding: EdgeInsets.all(BaycelSpacing.base),
-            decoration: BaycelComponents.card,
-            child: const SkeletonListTile(),
-          );
-        }
-        final deliveries = snapshot.data ?? [];
-        final pending = deliveries.where((d) =>
-          d.status == DeliveryStatus.pending || d.status == DeliveryStatus.inTransit).toList();
-
-        return Container(
-          padding: EdgeInsets.all(BaycelSpacing.base),
-          decoration: BaycelComponents.card,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Pending Delivery \u2014 Receive & Stock-In', style: BaycelTypography.title),
-              SizedBox(height: BaycelSpacing.xxs),
-              Text('${pending.length} deliveries awaiting',
-                style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 11.5)),
-              SizedBox(height: BaycelSpacing.md),
-              if (pending.isEmpty)
-                Center(child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: BaycelSpacing.lg),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.local_shipping_outlined, size: 32, color: BaycelColors.textDisabled),
-                      SizedBox(height: BaycelSpacing.sm),
-                      Text('No pending deliveries', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)),
-                    ],
-                  ),
-                ))
-              else
-                ...pending.map((d) => InkWell(
-                  onTap: () async {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: Text('Confirm Stock-In'),
-                        content: Text('Mark delivery from ${d.supplierName} as received?'),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel')),
-                          ElevatedButton(
-                            onPressed: () => Navigator.pop(ctx, true),
-                            style: BaycelComponents.buttonPrimary,
-                            child: Text('Confirm', style: TextStyle(color: Colors.white)),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (confirmed != true) return;
-                    onConfirmDelivery(d.id);
-                  },
-                  borderRadius: BorderRadius.circular(BaycelRadius.md),
-                  child: Container(
-                    padding: EdgeInsets.symmetric(vertical: 9),
-                    decoration: BoxDecoration(border: Border(bottom: BorderSide(color: BaycelColors.divider.withValues(alpha: 0.6), width: 0.5))),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 32, height: 32,
-                          decoration: BoxDecoration(color: BaycelColors.surface, borderRadius: BorderRadius.circular(BaycelRadius.lg)),
-                          child: Icon(Icons.inventory_2_outlined, color: BaycelColors.textSecondary, size: 15),
-                        ),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(d.supplierName, style: BaycelTypography.bodySm.copyWith(fontSize: 12.5, fontWeight: FontWeight.w600)),
-                              SizedBox(height: 1),
-                              Text('${d.items.length} products', style: BaycelTypography.labelSm.copyWith(fontSize: 11, color: BaycelColors.textMuted)),
-                            ],
-                          ),
-                        ),
-                        Icon(Icons.chevron_right, size: 16, color: BaycelColors.textDisabled),
-                      ],
-                    ),
-                  ),
-                )),
-            ],
-          ),
-        );
-      },
     );
   }
 }
@@ -485,6 +360,64 @@ class _RecentTransfersCard extends StatelessWidget {
                   '${m.productName} \u00b7 \u2212${m.quantity}',
                   '${m.createdAt.month}/${m.createdAt.day}',
                 )),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _LowStockNotificationCard extends StatelessWidget {
+  final Stream<List<Product>> productsStream;
+  final void Function(String productName) onProductTap;
+
+  const _LowStockNotificationCard({required this.productsStream, required this.onProductTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<Product>>(
+      stream: productsStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return SizedBox.shrink();
+        }
+        final products = snapshot.data ?? [];
+        final lowStock = products.where((p) => p.reorderLevel > 0 && p.stockQuantity <= p.reorderLevel).toList();
+
+        if (lowStock.isEmpty) return SizedBox.shrink();
+
+        return Container(
+          padding: EdgeInsets.all(BaycelSpacing.base),
+          decoration: BoxDecoration(
+            color: BaycelColors.error.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(BaycelRadius.lg),
+            border: Border.all(color: BaycelColors.error.withValues(alpha: 0.2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, size: 18, color: BaycelColors.error),
+                  SizedBox(width: BaycelSpacing.sm),
+                  Text('Low Stock Alert', style: BaycelTypography.title.copyWith(color: BaycelColors.error)),
+                  Spacer(),
+                  BaycelPill(label: '${lowStock.length} items', color: BaycelColors.error),
+                ],
+              ),
+              SizedBox(height: BaycelSpacing.sm),
+              ...lowStock.take(5).map((p) => Padding(
+                padding: EdgeInsets.only(bottom: BaycelSpacing.xs),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(p.name, style: BaycelTypography.bodySm.copyWith(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                    ),
+                    Text('${p.stockQuantity}/${p.reorderLevel}', style: BaycelTypography.dataMono.copyWith(fontSize: 11, color: BaycelColors.error)),
+                  ],
+                ),
+              )),
             ],
           ),
         );

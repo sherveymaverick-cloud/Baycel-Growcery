@@ -11,43 +11,12 @@ class NotificationBell extends StatefulWidget {
 }
 
 class _NotificationBellState extends State<NotificationBell> {
-  int _unreadCount = 0;
   List<Map<String, dynamic>> _notifications = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadNotifications();
-  }
-
-  void _loadNotifications() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-
-    try {
-      final snap = await FirebaseFirestore.instance
-          .collection('notifications')
-          .where('userId', isEqualTo: uid)
-          .where('read', isEqualTo: false)
-          .limit(20)
-          .get();
-
-      if (mounted) {
-        setState(() {
-          _notifications = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
-          _unreadCount = _notifications.length;
-        });
-      }
-    } catch (e) {
-      debugPrint('Load notifications failed: $e');
-    }
-  }
 
   void _markAsRead(String id) async {
     await FirebaseFirestore.instance.collection('notifications').doc(id).update({'read': true});
     setState(() {
       _notifications.removeWhere((n) => n['id'] == id);
-      _unreadCount = _notifications.length;
     });
   }
 
@@ -61,12 +30,10 @@ class _NotificationBellState extends State<NotificationBell> {
     await batch.commit();
     setState(() {
       _notifications.clear();
-      _unreadCount = 0;
     });
   }
 
   void _showNotifications() {
-    _loadNotifications();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -161,13 +128,33 @@ class _NotificationBellState extends State<NotificationBell> {
 
   @override
   Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return _buildBell();
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('notifications')
+          .where('userId', isEqualTo: uid)
+          .where('read', isEqualTo: false)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          _notifications = snapshot.data!.docs.map((d) => {'id': d.id, ...d.data() as Map<String, dynamic>}).toList();
+        }
+        return _buildBell();
+      },
+    );
+  }
+
+  Widget _buildBell() {
+    final count = _notifications.length;
     return GestureDetector(
       onTap: _showNotifications,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Icon(Icons.notifications_outlined, size: 22, color: BaycelColors.textSecondary),
-          if (_unreadCount > 0)
+          if (count > 0)
             Positioned(
               top: -4, right: -4,
               child: Container(
@@ -177,7 +164,7 @@ class _NotificationBellState extends State<NotificationBell> {
                   shape: BoxShape.circle,
                 ),
                 child: Text(
-                  _unreadCount > 9 ? '9+' : '$_unreadCount',
+                  count > 9 ? '9+' : '$count',
                   style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
                 ),
               ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
+import '../services/firestore_service.dart';
 import '../theme.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -25,6 +26,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   int _selectedPayday = 7;
   String _scheduleStart = '08:00';
   String _scheduleEnd = '17:00';
+  List<String> _selectedProducts = [];
 
   static const _roles = [
     ('owner', 'Owner', Color(0xFFC62828)),
@@ -98,7 +100,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         'payday': _selectedPayday,
         'schedule': {'start': _scheduleStart, 'end': _scheduleEnd},
         'rfidCardUID': '',
-        'assignedProducts': [],
+        'assignedProducts': _selectedRole == 'merchandiser' ? _selectedProducts : [],
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -359,6 +361,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Widget _buildEmploymentSection() {
+    if (_selectedRole == 'owner') return const SizedBox.shrink();
+    if (_selectedRole == 'merchandiser') return _buildProductAssignmentSection();
     return _SectionCard(
       title: 'Employment',
       children: [
@@ -369,6 +373,67 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _label('Payday'),
         SizedBox(height: BaycelSpacing.xs),
         _buildPaydaySelector(),
+      ],
+    );
+  }
+
+  Widget _buildProductAssignmentSection() {
+    return _SectionCard(
+      title: 'Product Assignment',
+      children: [
+        _label('Select products this merchandiser is assigned to'),
+        SizedBox(height: BaycelSpacing.xs),
+        StreamBuilder<List<Map<String, dynamic>>>(
+          stream: FirestoreService().getProducts().map((products) =>
+            products.map((p) => {'id': p.id, 'name': p.name}).toList()),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return CircularProgressIndicator(color: BaycelColors.crimson);
+            }
+            final products = snapshot.data ?? [];
+            if (products.isEmpty) {
+              return Text('No products available', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled));
+            }
+            return ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: 200),
+              child: Container(
+                padding: EdgeInsets.all(BaycelSpacing.sm),
+                decoration: BoxDecoration(
+                  color: BaycelColors.surface,
+                  borderRadius: BorderRadius.circular(BaycelRadius.md),
+                  border: Border.all(color: BaycelColors.divider),
+                ),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: products.length,
+                  itemBuilder: (context, index) {
+                    final product = products[index];
+                    final isSelected = _selectedProducts.contains(product['id']);
+                    return CheckboxListTile(
+                      value: isSelected,
+                      onChanged: (v) {
+                        setState(() {
+                          if (v == true) {
+                            _selectedProducts.add(product['id']!);
+                          } else {
+                            _selectedProducts.remove(product['id']);
+                          }
+                        });
+                      },
+                      title: Text(product['name']!, style: BaycelTypography.bodySm.copyWith(fontSize: 12.5)),
+                      activeColor: BaycelColors.crimson,
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+        ),
+        SizedBox(height: BaycelSpacing.xs),
+        Text('${_selectedProducts.length} products selected',
+          style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
       ],
     );
   }

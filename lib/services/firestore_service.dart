@@ -245,19 +245,6 @@ class FirestoreService {
     return AttendanceRecord.fromMap(doc.id, doc.data() as Map<String, dynamic>);
   }
 
-  Future<AttendanceRecord?> getTodaysAttendance(String employeeId) async {
-    final today = DateTime.now();
-    final dateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-    final query = await _attendance
-        .where('employeeId', isEqualTo: employeeId)
-        .where('date', isEqualTo: dateStr)
-        .limit(1)
-        .get();
-    if (query.docs.isEmpty) return null;
-    final doc = query.docs.first;
-    return AttendanceRecord.fromMap(doc.id, doc.data() as Map<String, dynamic>);
-  }
-
   // ── Absence Forms ──────────────────────────────
 
   Future<void> addAbsenceForm(AbsenceForm form) async {
