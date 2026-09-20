@@ -103,10 +103,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<NavigationItem> _getNavItemsForRole(String role) {
+    final switchTab = (int index) {
+      if (mounted && index >= 0 && index < _navItems.length) {
+        setState(() => _currentIndex = index);
+      }
+    };
     switch (role) {
       case 'owner':
         return [
-          NavigationItem(icon: Icons.dashboard, label: 'Dashboard', page: const OwnerDashboard()),
+          NavigationItem(icon: Icons.dashboard, label: 'Dashboard', page: OwnerDashboard(onNavigate: switchTab)),
           NavigationItem(icon: Icons.inventory_2, label: 'Inventory', page: InventoryScreen(role: 'owner')),
           NavigationItem(icon: Icons.local_shipping, label: 'Deliveries', page: const DeliveryScreen()),
           NavigationItem(icon: Icons.access_time, label: 'Attendance', page: const AttendanceScreen()),
@@ -117,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ];
       case 'manager':
         return [
-          NavigationItem(icon: Icons.dashboard, label: 'Dashboard', page: const ManagerDashboard()),
+          NavigationItem(icon: Icons.dashboard, label: 'Dashboard', page: ManagerDashboard(onNavigate: switchTab)),
           NavigationItem(icon: Icons.inventory_2, label: 'Inventory', page: InventoryScreen(role: 'manager')),
           NavigationItem(icon: Icons.local_shipping, label: 'Deliveries', page: const DeliveryScreen()),
           NavigationItem(icon: Icons.access_time, label: 'Attendance', page: const AttendanceScreen()),

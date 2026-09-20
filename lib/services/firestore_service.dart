@@ -112,6 +112,14 @@ class FirestoreService {
     }
   }
 
+  Future<void> updateProduct(String id, Map<String, dynamic> data) async {
+    try {
+      await _products.doc(id).update(data);
+    } catch (e) {
+      throw Exception('Failed to update product. Please try again.');
+    }
+  }
+
   Future<Product?> getProductById(String id) async {
     final doc = await _products.doc(id).get();
     if (!doc.exists) return null;

@@ -4,6 +4,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../theme.dart';
 import '../widgets/shared_widgets.dart';
 import '../models/product.dart';
+import '../models/stock_movement.dart';
 import '../models/delivery.dart';
 import '../models/cash_advance.dart';
 import '../models/attendance.dart';
@@ -739,36 +740,50 @@ class CreateDeliveryCard extends StatefulWidget {
 
 class _CreateDeliveryCardState extends State<CreateDeliveryCard> {
   final _supplierController = TextEditingController();
-  final _itemNameController = TextEditingController();
-  final _itemQtyController = TextEditingController(text: '1');
+  final _searchController = TextEditingController();
   final List<Map<String, String>> _items = [];
+  List<Product> _searchResults = [];
+  bool _showResults = false;
 
   @override
   void dispose() {
     _supplierController.dispose();
-    _itemNameController.dispose();
-    _itemQtyController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
-  void _addItem() {
-    final name = _itemNameController.text.trim();
-    final qty = int.tryParse(_itemQtyController.text.trim()) ?? 0;
-    if (name.isEmpty || qty <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Enter product name and valid quantity')));
+  void _searchProducts(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() { _searchResults = []; _showResults = false; });
       return;
     }
+    final products = await widget.firestore.getProducts().first;
+    final results = products.where((p) =>
+      p.name.toLowerCase().contains(query.toLowerCase()) ||
+      p.sku.toLowerCase().contains(query.toLowerCase())
+    ).toList();
+    setState(() { _searchResults = results; _showResults = true; });
+  }
+
+  void _addProduct(Product product) {
     setState(() {
-      final existing = _items.indexWhere((i) => i['name']!.toLowerCase() == name.toLowerCase());
+      final existing = _items.indexWhere((i) => i['name']!.toLowerCase() == product.name.toLowerCase());
       if (existing >= 0) {
         final currentQty = int.tryParse(_items[existing]['qty']!) ?? 0;
-        _items[existing]['qty'] = (currentQty + qty).toString();
+        _items[existing]['qty'] = (currentQty + 1).toString();
       } else {
-        _items.add({'name': name, 'qty': qty.toString()});
+        _items.add({'name': product.name, 'qty': '1'});
       }
     });
-    _itemNameController.clear();
-    _itemQtyController.text = '1';
+    _searchController.clear();
+    setState(() { _searchResults = []; _showResults = false; });
+  }
+
+  void _incrementItem(int index) {
+    setState(() {
+      final currentQty = int.tryParse(_items[index]['qty']!) ?? 0;
+      _items[index]['qty'] = (currentQty + 1).toString();
+    });
   }
 
   void _decrementItem(int index) {
@@ -786,30 +801,6 @@ class _CreateDeliveryCardState extends State<CreateDeliveryCard> {
     setState(() => _items.removeAt(index));
   }
 
-  void _editItemName(int index) {
-    final controller = TextEditingController(text: _items[index]['name']);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Edit Product Name'),
-        content: TextField(controller: controller, autofocus: true, decoration: InputDecoration(hintText: 'Product name')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel')),
-          TextButton(
-            onPressed: () {
-              final newName = controller.text.trim();
-              if (newName.isNotEmpty) {
-                setState(() => _items[index]['name'] = newName);
-              }
-              Navigator.pop(ctx);
-            },
-            child: Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _submit() {
     final supplier = _supplierController.text.trim();
     if (supplier.isEmpty) {
@@ -823,6 +814,233 @@ class _CreateDeliveryCardState extends State<CreateDeliveryCard> {
     widget.onSubmit(supplier, List.from(_items));
     _supplierController.clear();
     setState(() => _items.clear());
+  }
+
+  void _scanBarcode() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => BarcodeScannerSheet(
+        onScanned: (code) async {
+          Navigator.pop(ctx);
+          final product = await widget.firestore.getProductByBarcode(code);
+          if (product != null) {
+            _addProduct(product);
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${product.name} added')));
+          } else {
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No product found for: $code'), backgroundColor: BaycelColors.marigoldDark));
+          }
+        },
+      ),
+    );
+  }
+
+  Future<void> _scanPaperList() async {
+    final result = await Navigator.push<List<Map<String, String>>>(
+      context,
+      MaterialPageRoute(builder: (_) => const DeliveryScannerScreen()),
+    );
+    if (result != null && result.isNotEmpty) {
+      setState(() => _items.addAll(result));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${result.length} items added from scan')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(BaycelSpacing.base),
+      decoration: BaycelComponents.card,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Create Delivery Record', style: BaycelTypography.title),
+                  SizedBox(height: BaycelSpacing.md),
+                  buildFieldLabel('Supplier'),
+                  SizedBox(height: 5),
+                  TextField(
+                    controller: _supplierController,
+                    style: BaycelTypography.body.copyWith(fontSize: 13),
+                    decoration: BaycelComponents.input.copyWith(
+                      hintText: 'e.g. Golden Grain Traders', filled: true, fillColor: BaycelColors.card),
+                  ),
+                  SizedBox(height: BaycelSpacing.md),
+                  buildFieldLabel('Search Products'),
+                  SizedBox(height: 5),
+                  TextField(
+                    controller: _searchController,
+                    style: BaycelTypography.body.copyWith(fontSize: 13),
+                    decoration: BaycelComponents.input.copyWith(
+                      hintText: 'Type product name or SKU...',
+                      prefixIcon: Icon(Icons.search, size: 18, color: BaycelColors.textSecondary),
+                      suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.clear, size: 16),
+                            onPressed: () { _searchController.clear(); setState(() { _searchResults = []; _showResults = false; }); },
+                          )
+                        : null,
+                      filled: true, fillColor: BaycelColors.card),
+                    onChanged: _searchProducts,
+                  ),
+                  if (_showResults && _searchResults.isNotEmpty) ...[
+                    SizedBox(height: BaycelSpacing.xs),
+                    Container(
+                      constraints: BoxConstraints(maxHeight: 150),
+                      decoration: BoxDecoration(
+                        color: BaycelColors.surface,
+                        borderRadius: BorderRadius.circular(BaycelRadius.md),
+                        border: Border.all(color: BaycelColors.divider),
+                      ),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _searchResults.length,
+                        itemBuilder: (context, i) {
+                          final p = _searchResults[i];
+                          return InkWell(
+                            onTap: () => _addProduct(p),
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: 9),
+                              decoration: BoxDecoration(border: Border(bottom: BorderSide(color: BaycelColors.divider.withValues(alpha: 0.4), width: 0.5))),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.inventory_outlined, size: 16, color: BaycelColors.textSecondary),
+                                  SizedBox(width: BaycelSpacing.sm),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(p.name, style: BaycelTypography.bodySm.copyWith(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                                        Text('${p.stockQuantity} ${p.unit} in stock', style: BaycelTypography.labelSm.copyWith(fontSize: 10.5, color: BaycelColors.textMuted)),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(Icons.add_circle_outline, size: 16, color: BaycelColors.crimson),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                  SizedBox(height: BaycelSpacing.sm),
+                  Wrap(
+                    spacing: BaycelSpacing.sm,
+                    runSpacing: BaycelSpacing.sm,
+                    children: [
+                      _buildScanChip(icon: Icons.document_scanner_outlined, label: 'Scan Paper List', onTap: _scanPaperList),
+                      _buildScanChip(icon: Icons.qr_code_scanner, label: 'Scan Barcode', onTap: _scanBarcode),
+                    ],
+                  ),
+                  if (_items.isNotEmpty) ...[
+                    SizedBox(height: BaycelSpacing.md),
+                    Container(
+                      padding: EdgeInsets.all(BaycelSpacing.sm),
+                      decoration: BoxDecoration(
+                        color: BaycelColors.surface,
+                        borderRadius: BorderRadius.circular(BaycelRadius.md),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.checklist, size: 14, color: BaycelColors.textMuted),
+                              SizedBox(width: BaycelSpacing.xs),
+                              Text('Delivery Items (${_items.length})', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
+                            ],
+                          ),
+                          SizedBox(height: BaycelSpacing.sm),
+                          ...List.generate(_items.length, (i) => Padding(
+                            padding: EdgeInsets.only(bottom: BaycelSpacing.xs),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(_items[i]['name']!, style: BaycelTypography.bodySm.copyWith(fontSize: 12.5, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                ),
+                                GestureDetector(
+                                  onTap: () => _decrementItem(i),
+                                  child: Container(
+                                    width: 26, height: 26,
+                                    decoration: BoxDecoration(color: BaycelColors.error.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(BaycelRadius.sm)),
+                                    child: Icon(Icons.remove, size: 14, color: BaycelColors.error),
+                                  ),
+                                ),
+                                SizedBox(width: BaycelSpacing.xs),
+                                SizedBox(
+                                  width: 40,
+                                  child: TextField(
+                                    keyboardType: TextInputType.number,
+                                    textAlign: TextAlign.center,
+                                    style: BaycelTypography.dataMono.copyWith(fontSize: 11, color: BaycelColors.crimson),
+                                    decoration: InputDecoration(
+                                      border: InputBorder.none,
+                                      contentPadding: EdgeInsets.zero,
+                                      isDense: true,
+                                    ),
+                                    controller: TextEditingController(text: _items[i]['qty']),
+                                    onChanged: (v) {
+                                      final parsed = int.tryParse(v);
+                                      if (parsed != null && parsed > 0) {
+                                        setState(() => _items[i]['qty'] = parsed.toString());
+                                      }
+                                    },
+                                  ),
+                                ),
+                                SizedBox(width: BaycelSpacing.xs),
+                                GestureDetector(
+                                  onTap: () => _incrementItem(i),
+                                  child: Container(
+                                    width: 26, height: 26,
+                                    decoration: BoxDecoration(color: BaycelColors.success.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(BaycelRadius.sm)),
+                                    child: Icon(Icons.add, size: 14, color: BaycelColors.success),
+                                  ),
+                                ),
+                                SizedBox(width: BaycelSpacing.sm),
+                                GestureDetector(
+                                  onTap: () => _removeItem(i),
+                                  child: Icon(Icons.close, size: 14, color: BaycelColors.textDisabled),
+                                ),
+                              ],
+                            ),
+                          )),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: BaycelSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _submit,
+              style: BaycelComponents.buttonPrimary.copyWith(
+                padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: BaycelSpacing.buttonHorizontal, vertical: BaycelSpacing.buttonVertical)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.save, size: 16, color: Colors.white),
+                  SizedBox(width: BaycelSpacing.sm),
+                  Text(
+                    _items.isEmpty ? 'Encode Delivery' : 'Encode Delivery (${_items.length} items)',
+                    style: BaycelTypography.label.copyWith(color: Colors.white, fontSize: 12.5),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildScanChip({required IconData icon, required String label, required VoidCallback onTap}) {
@@ -843,316 +1061,6 @@ class _CreateDeliveryCardState extends State<CreateDeliveryCard> {
             Text(label, style: BaycelTypography.labelXs.copyWith(color: BaycelColors.crimson, fontWeight: FontWeight.w600)),
           ],
         ),
-      ),
-    );
-  }
-
-  Future<void> _scanPaperList() async {
-    final result = await Navigator.push<List<Map<String, String>>>(
-      context,
-      MaterialPageRoute(builder: (_) => const DeliveryScannerScreen()),
-    );
-    if (result != null && result.isNotEmpty) {
-      setState(() => _items.addAll(result));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${result.length} items added from scan')),
-        );
-      }
-    }
-  }
-
-  void _scanBarcode() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => BarcodeScannerSheet(
-        onScanned: (code) async {
-          Navigator.pop(ctx);
-          final product = await widget.firestore.getProductByBarcode(code);
-          if (product != null) {
-            final existing = _items.indexWhere((i) => i['name']!.toLowerCase() == product.name.toLowerCase());
-            if (existing >= 0) {
-              final currentQty = int.tryParse(_items[existing]['qty']!) ?? 0;
-              setState(() => _items[existing]['qty'] = (currentQty + 1).toString());
-            } else {
-              setState(() => _items.add({'name': product.name, 'qty': '1'}));
-            }
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${product.name} added')),
-              );
-            }
-          } else {
-            if (mounted) {
-              showDialog(
-                context: context,
-                builder: (dCtx) {
-                  final nameCtrl = TextEditingController();
-                  final qtyCtrl = TextEditingController(text: '1');
-                  return AlertDialog(
-                    title: Text('Product Not Found'),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('Barcode "$code" has no matching product. Add manually?'),
-                        SizedBox(height: BaycelSpacing.sm),
-                        TextField(controller: nameCtrl, decoration: InputDecoration(hintText: 'Product name', contentPadding: EdgeInsets.all(10), border: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.sm)))),
-                        SizedBox(height: BaycelSpacing.xs),
-                        TextField(controller: qtyCtrl, keyboardType: TextInputType.number, decoration: InputDecoration(hintText: 'Quantity', contentPadding: EdgeInsets.all(10), border: OutlineInputBorder(borderRadius: BorderRadius.circular(BaycelRadius.sm)))),
-                      ],
-                    ),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(dCtx), child: Text('Cancel')),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(dCtx);
-                          final name = nameCtrl.text.trim();
-                          final qty = qtyCtrl.text.trim();
-                          if (name.isNotEmpty) {
-                            final existing = _items.indexWhere((i) => i['name']!.toLowerCase() == name.toLowerCase());
-                            if (existing >= 0) {
-                              final currentQty = int.tryParse(_items[existing]['qty']!) ?? 0;
-                              setState(() => _items[existing]['qty'] = (currentQty + (int.tryParse(qty) ?? 1)).toString());
-                            } else {
-                              setState(() => _items.add({'name': name, 'qty': qty}));
-                            }
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name added')));
-                          }
-                        },
-                        child: Text('Add', style: TextStyle(color: BaycelColors.crimson)),
-                      ),
-                    ],
-                  );
-                },
-              );
-            }
-          }
-        },
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(BaycelSpacing.base),
-      decoration: BaycelComponents.card,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('Create Delivery Record', style: BaycelTypography.title),
-          SizedBox(height: BaycelSpacing.md),
-          buildFieldLabel('Supplier'),
-          SizedBox(height: 5),
-          TextField(
-            controller: _supplierController,
-            style: BaycelTypography.body.copyWith(fontSize: 13),
-            decoration: BaycelComponents.input.copyWith(
-              hintText: 'e.g. Golden Grain Traders', filled: true, fillColor: BaycelColors.card),
-          ),
-          SizedBox(height: BaycelSpacing.md),
-          buildFieldLabel('Products'),
-          SizedBox(height: 5),
-          Wrap(
-            spacing: BaycelSpacing.sm,
-            runSpacing: BaycelSpacing.sm,
-            children: [
-              _buildScanChip(
-                icon: Icons.document_scanner_outlined,
-                label: 'Scan Paper List',
-                onTap: _scanPaperList,
-              ),
-              _buildScanChip(
-                icon: Icons.qr_code_scanner,
-                label: 'Scan Barcode',
-                onTap: _scanBarcode,
-              ),
-            ],
-          ),
-          SizedBox(height: BaycelSpacing.sm),
-          if (_items.isNotEmpty) ...[
-            ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: 120),
-              child: Container(
-                padding: EdgeInsets.all(BaycelSpacing.sm),
-                decoration: BoxDecoration(
-                  color: BaycelColors.surface,
-                  borderRadius: BorderRadius.circular(BaycelRadius.md),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.checklist, size: 14, color: BaycelColors.textMuted),
-                        SizedBox(width: BaycelSpacing.xs),
-                        Text('Delivery Checklist (${_items.length} items)', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
-                      ],
-                    ),
-                    SizedBox(height: BaycelSpacing.sm),
-                    Flexible(
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: _items.length,
-                        itemBuilder: (context, i) => Padding(
-                          padding: EdgeInsets.only(bottom: BaycelSpacing.sm),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(_items[i]['name']!, style: BaycelTypography.bodySm.copyWith(fontSize: 12.5, fontWeight: FontWeight.w600)),
-                              ),
-                              GestureDetector(
-                                onTap: () => _editItemName(i),
-                                child: Container(
-                                  width: 24, height: 24,
-                                  decoration: BoxDecoration(
-                                    color: BaycelColors.blue.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(BaycelRadius.sm),
-                                  ),
-                                  child: Icon(Icons.edit, size: 13, color: BaycelColors.blue),
-                                ),
-                              ),
-                              SizedBox(width: BaycelSpacing.sm),
-                              GestureDetector(
-                                onTap: () => _decrementItem(i),
-                                child: Container(
-                                  width: 24, height: 24,
-                                  decoration: BoxDecoration(
-                                    color: BaycelColors.error.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(BaycelRadius.sm),
-                                  ),
-                                  child: Icon(Icons.remove, size: 14, color: BaycelColors.error),
-                                ),
-                              ),
-                              SizedBox(width: BaycelSpacing.sm),
-                              Text('x${_items[i]['qty']}', style: BaycelTypography.dataMono.copyWith(fontSize: 11, color: BaycelColors.crimson)),
-                              SizedBox(width: BaycelSpacing.sm),
-                              GestureDetector(
-                                onTap: () {
-                                  final currentQty = int.tryParse(_items[i]['qty']!) ?? 0;
-                                  setState(() => _items[i]['qty'] = (currentQty + 1).toString());
-                                },
-                                child: Container(
-                                  width: 24, height: 24,
-                                  decoration: BoxDecoration(
-                                    color: BaycelColors.success.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(BaycelRadius.sm),
-                                  ),
-                                  child: Icon(Icons.add, size: 14, color: BaycelColors.success),
-                                ),
-                              ),
-                              SizedBox(width: BaycelSpacing.sm),
-                              GestureDetector(
-                                onTap: () => _removeItem(i),
-                                child: Icon(Icons.close, size: 14, color: BaycelColors.textDisabled),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SizedBox(height: BaycelSpacing.sm),
-          ],
-          Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: TextField(
-                  controller: _itemNameController,
-                  style: BaycelTypography.body.copyWith(fontSize: 13),
-                  decoration: BaycelComponents.input.copyWith(
-                    hintText: 'Product name', filled: true, fillColor: BaycelColors.card),
-                  onSubmitted: (_) => _addItem(),
-                ),
-              ),
-              SizedBox(width: BaycelSpacing.sm),
-              GestureDetector(
-                onTap: () {
-                  final current = int.tryParse(_itemQtyController.text) ?? 0;
-                  if (current > 1) _itemQtyController.text = (current - 1).toString();
-                },
-                child: Container(
-                  width: 32, height: 32,
-                  decoration: BoxDecoration(
-                    color: BaycelColors.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(BaycelRadius.sm),
-                  ),
-                  child: Icon(Icons.remove, size: 16, color: BaycelColors.error),
-                ),
-              ),
-              SizedBox(width: BaycelSpacing.xs),
-              SizedBox(
-                width: 32,
-                child: TextField(
-                  controller: _itemQtyController,
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  style: BaycelTypography.dataMono.copyWith(fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: '1',
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                    isDense: true,
-                  ),
-                ),
-              ),
-              SizedBox(width: BaycelSpacing.xs),
-              GestureDetector(
-                onTap: () {
-                  final current = int.tryParse(_itemQtyController.text) ?? 0;
-                  _itemQtyController.text = (current + 1).toString();
-                },
-                child: Container(
-                  width: 32, height: 32,
-                  decoration: BoxDecoration(
-                    color: BaycelColors.success.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(BaycelRadius.sm),
-                  ),
-                  child: Icon(Icons.add, size: 16, color: BaycelColors.success),
-                ),
-              ),
-              SizedBox(width: BaycelSpacing.sm),
-              GestureDetector(
-                onTap: _addItem,
-                child: Container(
-                  width: 32, height: 32,
-                  decoration: BoxDecoration(color: BaycelColors.crimson, borderRadius: BorderRadius.circular(BaycelRadius.md)),
-                  child: Icon(Icons.save, color: Colors.white, size: 16),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: BaycelSpacing.sm),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _submit,
-              style: BaycelComponents.buttonPrimary.copyWith(
-                padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: BaycelSpacing.buttonHorizontal, vertical: BaycelSpacing.buttonVertical)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.save, size: 16, color: Colors.white),
-                  SizedBox(width: BaycelSpacing.sm),
-                  Text(
-                    _items.isEmpty
-                      ? 'Encode Delivery'
-                      : 'Encode Delivery (${_items.length} items)',
-                    style: BaycelTypography.label.copyWith(color: Colors.white, fontSize: 12.5),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1333,12 +1241,25 @@ class _VerifyDeliveriesCardState extends State<VerifyDeliveriesCard> {
                             child: Icon(Icons.remove, size: 14, color: BaycelColors.error),
                           ),
                         ),
-                        SizedBox(width: BaycelSpacing.sm),
+                        SizedBox(width: BaycelSpacing.xs),
                         ListenableBuilder(
                           listenable: ctrl,
-                          builder: (context, _) => Text('x${ctrl.text.isEmpty ? '0' : ctrl.text}', style: BaycelTypography.dataMono.copyWith(fontSize: 11, color: BaycelColors.crimson)),
+                          builder: (context, _) => SizedBox(
+                            width: 40,
+                            child: TextField(
+                              controller: ctrl,
+                              keyboardType: TextInputType.number,
+                              textAlign: TextAlign.center,
+                              style: BaycelTypography.dataMono.copyWith(fontSize: 11, color: BaycelColors.crimson),
+                              decoration: InputDecoration(
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.zero,
+                                isDense: true,
+                              ),
+                            ),
+                          ),
                         ),
-                        SizedBox(width: BaycelSpacing.sm),
+                        SizedBox(width: BaycelSpacing.xs),
                         GestureDetector(
                           onTap: () {
                             final current = int.tryParse(ctrl.text) ?? 0;
@@ -1413,6 +1334,27 @@ class _VerifyDeliveriesCardState extends State<VerifyDeliveriesCard> {
                         receivedQuantity: received,
                       );
                     });
+
+                    for (final item in updatedItems) {
+                      if (item.receivedQuantity <= 0) continue;
+                      final products = await widget.firestore.getProducts().first;
+                      final product = products.where((p) => p.id == item.productId || p.name == item.productName).firstOrNull;
+                      if (product != null) {
+                        final newQty = product.stockQuantity + item.receivedQuantity;
+                        await widget.firestore.updateProduct(product.id, {'stockQuantity': newQty});
+                        await widget.firestore.addStockMovement(StockMovement(
+                          id: '',
+                          productId: product.id,
+                          productName: product.name,
+                          type: StockMovementType.stockIn,
+                          quantity: item.receivedQuantity,
+                          balanceAfter: newQty,
+                          performedBy: FirebaseAuth.instance.currentUser?.uid ?? '',
+                          createdAt: DateTime.now(),
+                        ));
+                      }
+                    }
+
                     await widget.firestore.updateDelivery(d.id, {
                       'items': updatedItems.map((item) => item.toMap()).toList(),
                       'status': 'delivered',

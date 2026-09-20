@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../theme.dart';
 import '../../widgets/shared_widgets.dart';
 import '../../widgets/floor_staff_helpers.dart';
@@ -8,6 +7,7 @@ import '../../models/product.dart';
 import '../../models/stock_movement.dart';
 import '../../models/user.dart';
 import '../../models/absence_form.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class MerchandiserDashboard extends StatefulWidget {
   final FirestoreService firestore;
@@ -179,8 +179,7 @@ class _AssignedProductsCard extends StatelessWidget {
         final assigned = assignedIds.isEmpty
           ? products.take(5).toList()
           : products.where((p) => assignedIds.contains(p.id)).toList();
-
-        final lowStockCount = assigned.where((p) => p.reorderLevel > 0 && p.stockQuantity <= p.reorderLevel).length;
+        final lowStock = assigned.where((p) => p.reorderLevel > 0 && p.stockQuantity <= p.reorderLevel).toList();
 
         return Container(
           padding: EdgeInsets.all(BaycelSpacing.base),
@@ -192,29 +191,29 @@ class _AssignedProductsCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('My Assigned Products', style: BaycelTypography.title),
-                  if (lowStockCount > 0)
-                    BaycelPill(label: '$lowStockCount low stock', color: BaycelColors.error),
+                  if (lowStock.isNotEmpty)
+                    BaycelPill(label: '${lowStock.length} low stock', color: BaycelColors.error),
                 ],
               ),
               SizedBox(height: BaycelSpacing.xxs),
               Text('Stock-out only applies to products assigned to you',
                 style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 11.5)),
               SizedBox(height: BaycelSpacing.md),
-              if (assigned.isEmpty)
+              if (lowStock.isEmpty)
                 Center(child: Padding(
                   padding: EdgeInsets.symmetric(vertical: BaycelSpacing.lg),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.inventory_2_outlined, size: 32, color: BaycelColors.textDisabled),
+                      Icon(Icons.check_circle_outline, size: 32, color: BaycelColors.success),
                       SizedBox(height: BaycelSpacing.sm),
-                      Text('No products assigned', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)),
+                      Text('All assigned products are well-stocked', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)),
                     ],
                   ),
                 ))
               else
-                ...assigned.map((p) {
-                  final isLow = p.reorderLevel > 0 && p.stockQuantity <= p.reorderLevel;
+                ...lowStock.map((p) {
+                  final isOut = p.stockQuantity <= 0;
                   return InkWell(
                     onTap: () => onStockOut(p.name),
                     borderRadius: BorderRadius.circular(BaycelRadius.md),
@@ -240,8 +239,8 @@ class _AssignedProductsCard extends StatelessWidget {
                             ),
                           ),
                           BaycelPill(
-                            label: isLow ? 'Low Stock' : 'In Stock',
-                            color: isLow ? BaycelColors.error : BaycelColors.success,
+                            label: isOut ? 'Out of Stock' : 'Low Stock',
+                            color: isOut ? BaycelColors.error : BaycelColors.marigoldDark,
                           ),
                           SizedBox(width: BaycelSpacing.sm),
                           OutlinedButton(
@@ -381,58 +380,49 @@ class _AbsenceFormCardState extends State<_AbsenceFormCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Submit Absence Form', style: BaycelTypography.title),
-          SizedBox(height: BaycelSpacing.xxs),
-          Text('Requests are reviewed by your Manager',
-            style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 11.5)),
+          Row(
+            children: [
+              Icon(Icons.event_busy_outlined, size: 18, color: BaycelColors.crimson),
+              SizedBox(width: BaycelSpacing.sm),
+              Text('Request Absence', style: BaycelTypography.title),
+            ],
+          ),
           SizedBox(height: BaycelSpacing.md),
-          buildFieldLabel('Date(s)'),
-          SizedBox(height: 5),
           GestureDetector(
             onTap: _pickDates,
             child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.base, vertical: 12),
               decoration: BoxDecoration(
-                color: BaycelColors.card,
-                borderRadius: BorderRadius.circular(BaycelRadius.md),
                 border: Border.all(color: BaycelColors.divider),
+                borderRadius: BorderRadius.circular(BaycelRadius.md),
               ),
               child: Row(
                 children: [
                   Icon(Icons.date_range, size: 18, color: BaycelColors.textSecondary),
                   SizedBox(width: BaycelSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      dateText.isEmpty ? 'Select date range' : dateText,
-                      style: BaycelTypography.body.copyWith(
-                        fontSize: 13,
-                        color: dateText.isEmpty ? BaycelColors.textDisabled : BaycelColors.textPrimary,
-                      ),
-                    ),
+                  Text(
+                    dateText.isEmpty ? 'Select date range' : dateText,
+                    style: dateText.isEmpty
+                      ? BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)
+                      : BaycelTypography.bodySm,
                   ),
-                  Icon(Icons.chevron_right, size: 16, color: BaycelColors.textDisabled),
                 ],
               ),
             ),
           ),
-          SizedBox(height: BaycelSpacing.md),
-          buildFieldLabel('Reason'),
-          SizedBox(height: 5),
+          SizedBox(height: BaycelSpacing.sm),
           TextField(
             controller: _reasonController,
-            style: BaycelTypography.body.copyWith(fontSize: 13),
-            decoration: BaycelComponents.input.copyWith(
-              hintText: 'Brief reason for absence', filled: true, fillColor: BaycelColors.card),
+            decoration: BaycelComponents.input.copyWith(hintText: 'Reason for absence'),
+            maxLines: 2,
           ),
           SizedBox(height: BaycelSpacing.md),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: _submit,
-              style: BaycelComponents.buttonPrimary.copyWith(
-                padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: BaycelSpacing.buttonHorizontal, vertical: BaycelSpacing.buttonVertical)),
-              ),
-              child: Text('Submit Request', style: BaycelTypography.label.copyWith(color: Colors.white, fontSize: 12.5)),
+              style: BaycelComponents.buttonPrimary,
+              child: Text('Submit Request'),
             ),
           ),
         ],
@@ -458,8 +448,8 @@ class _AbsenceRequestsCard extends StatelessWidget {
             child: const SkeletonListTile(),
           );
         }
-        final List<AbsenceForm> forms = snapshot.data ?? [];
-        final List<AbsenceForm> myForms = forms.where((AbsenceForm f) =>
+        final forms = snapshot.data ?? [];
+        final myForms = forms.where((f) =>
           f.employeeId == FirebaseAuth.instance.currentUser?.uid).take(5).toList();
 
         return Container(

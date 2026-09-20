@@ -13,29 +13,37 @@ import '../models/cash_advance.dart';
 import '../models/absence_form.dart';
 import '../widgets/floor_staff_helpers.dart';
 import 'floor_staff/delivery_scanner_screen.dart';
-import 'inventory_screen.dart';
-import 'delivery_screen.dart';
 
 class ManagerDashboard extends StatefulWidget {
-  const ManagerDashboard({super.key});
+  final void Function(int index)? onNavigate;
+
+  const ManagerDashboard({super.key, this.onNavigate});
 
   @override
   State<ManagerDashboard> createState() => _ManagerDashboardState();
 }
 
-class _ManagerDashboardState extends State<ManagerDashboard> {
+class _ManagerDashboardState extends State<ManagerDashboard> with TickerProviderStateMixin {
   final _firestore = FirestoreService();
   String _userName = 'Manager';
   bool _isClockedIn = false;
   bool _isOnBreak = false;
   String _clockTime = '';
   String _todayAttendanceId = '';
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadUserName();
     _restoreClockInState();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   void _loadUserName() async {
@@ -192,6 +200,8 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
           SizedBox(height: BaycelSpacing.lg),
           _buildChartsRow(),
           SizedBox(height: BaycelSpacing.lg),
+          _buildDeliveryManagement(),
+          SizedBox(height: BaycelSpacing.lg),
           _buildBottomRow(),
           SizedBox(height: BaycelSpacing.lg),
           CashAdvanceCard(onSubmit: (amount, reason) async {
@@ -275,7 +285,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
                 child: _QuickActionCard(
                   icon: Icons.inventory_2_outlined,
                   label: 'Inventory',
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => InventoryScreen(role: 'manager'))),
+                  onTap: () => widget.onNavigate?.call(1),
                 ),
               ),
               SizedBox(width: BaycelSpacing.md),
@@ -283,7 +293,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
                 child: _QuickActionCard(
                   icon: Icons.local_shipping_outlined,
                   label: 'Deliveries',
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DeliveryScreen())),
+                  onTap: () => widget.onNavigate?.call(2),
                 ),
               ),
             ],
@@ -602,6 +612,68 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
     );
   }
 
+  Widget _buildDeliveryManagement() {
+    return Container(
+      padding: EdgeInsets.all(BaycelSpacing.base),
+      decoration: BaycelComponents.card,
+      child: Column(
+        children: [
+          TabBar(
+            controller: _tabController,
+            labelColor: BaycelColors.crimson,
+            unselectedLabelColor: BaycelColors.textMuted,
+            indicatorColor: BaycelColors.crimson,
+            indicatorSize: TabBarIndicatorSize.label,
+            labelStyle: BaycelTypography.label.copyWith(fontSize: 12.5),
+            unselectedLabelStyle: BaycelTypography.label.copyWith(fontSize: 12.5),
+            tabs: const [
+              Tab(text: 'Create Delivery'),
+              Tab(text: 'Verify Deliveries'),
+            ],
+          ),
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.5,
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                CreateDeliveryCard(
+                  firestore: _firestore,
+                  onSubmit: (supplier, items) async {
+                    try {
+                      final products = await _firestore.getProducts().first;
+                      final deliveryItems = items.map((entry) {
+                        final matched = products.where((p) => p.name.toLowerCase() == entry['name']!.toLowerCase()).toList();
+                        return DeliveryItem(
+                          productId: matched.isNotEmpty ? matched.first.id : '',
+                          productName: entry['name']!,
+                          expectedQuantity: int.parse(entry['qty']!),
+                          receivedQuantity: 0,
+                        );
+                      }).toList();
+                      await _firestore.addDelivery(Delivery(
+                        id: '',
+                        supplierName: supplier,
+                        items: deliveryItems,
+                        status: DeliveryStatus.pending,
+                        createdAt: DateTime.now(),
+                      ));
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Delivery created')));
+                    } catch (e) {
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to create delivery'), backgroundColor: BaycelColors.error),
+                      );
+                    }
+                  },
+                ),
+                VerifyDeliveriesCard(firestore: _firestore),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBottomRow() {
     return StreamBuilder<List<Product>>(
       stream: _firestore.getProducts(),
@@ -657,7 +729,10 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Needs Reordering', style: BaycelTypography.headlineMd),
-              Text('View all', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textSecondary, fontWeight: FontWeight.w600)),
+              GestureDetector(
+                onTap: () => widget.onNavigate?.call(1),
+                child: Text('View all', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.crimson, fontWeight: FontWeight.w600)),
+              ),
             ],
           ),
           SizedBox(height: BaycelSpacing.sm),
@@ -694,7 +769,10 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Deliveries Awaiting Verification', style: BaycelTypography.headlineMd),
-              Text('View all', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textSecondary, fontWeight: FontWeight.w600)),
+              GestureDetector(
+                onTap: () => widget.onNavigate?.call(2),
+                child: Text('View all', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.crimson, fontWeight: FontWeight.w600)),
+              ),
             ],
           ),
           SizedBox(height: BaycelSpacing.sm),

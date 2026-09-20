@@ -6,6 +6,7 @@ import '../widgets/shared_widgets.dart';
 import '../widgets/animated_widgets.dart';
 import '../services/firestore_service.dart';
 import '../models/delivery.dart';
+import '../models/stock_movement.dart';
 
 class DeliveryScreen extends StatefulWidget {
   const DeliveryScreen({super.key});
@@ -312,6 +313,27 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         expectedQuantity: item.expectedQuantity,
         receivedQuantity: item.expectedQuantity,
       )).toList();
+
+      for (final item in updatedItems) {
+        if (item.receivedQuantity <= 0) continue;
+        final products = await _firestore.getProducts().first;
+        final product = products.where((p) => p.id == item.productId || p.name == item.productName).firstOrNull;
+        if (product != null) {
+          final newQty = product.stockQuantity + item.receivedQuantity;
+          await _firestore.updateProduct(product.id, {'stockQuantity': newQty});
+          await _firestore.addStockMovement(StockMovement(
+            id: '',
+            productId: product.id,
+            productName: product.name,
+            type: StockMovementType.stockIn,
+            quantity: item.receivedQuantity,
+            balanceAfter: newQty,
+            performedBy: FirebaseAuth.instance.currentUser?.uid ?? '',
+            createdAt: DateTime.now(),
+          ));
+        }
+      }
+
       await _firestore.updateDelivery(delivery.id, {
         'items': updatedItems.map((item) => item.toMap()).toList(),
         'status': 'delivered',

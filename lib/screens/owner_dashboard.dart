@@ -11,19 +11,19 @@ import '../models/attendance.dart';
 import '../models/absence_form.dart';
 import '../models/cash_advance.dart';
 import '../models/stock_movement.dart';
-import 'inventory_screen.dart';
-import 'delivery_screen.dart';
-import 'payroll_screen.dart';
+import '../widgets/floor_staff_shared_widgets.dart';
 import 'floor_staff/delivery_scanner_screen.dart';
 
 class OwnerDashboard extends StatefulWidget {
-  const OwnerDashboard({super.key});
+  final void Function(int index)? onNavigate;
+
+  const OwnerDashboard({super.key, this.onNavigate});
 
   @override
   State<OwnerDashboard> createState() => _OwnerDashboardState();
 }
 
-class _OwnerDashboardState extends State<OwnerDashboard> {
+class _OwnerDashboardState extends State<OwnerDashboard> with TickerProviderStateMixin {
   final _firestore = FirestoreService();
   String _userName = 'Owner';
   bool _isProcessingAbsence = false;
@@ -38,32 +38,20 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
   final _chartsKey = GlobalKey();
   final _productsKey = GlobalKey();
   final _deliveriesKey = GlobalKey();
-
-  void _scrollTo(GlobalKey key) {
-    final ctx = key.currentContext;
-    if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-  }
-
-  Widget _buildJumpChip(String label, IconData icon, GlobalKey key) {
-    return Padding(
-      padding: EdgeInsets.only(right: BaycelSpacing.sm),
-      child: ActionChip(
-        avatar: Icon(icon, size: 16, color: BaycelColors.crimson),
-        label: Text(label, style: BaycelTypography.labelXs.copyWith(color: BaycelColors.crimson)),
-        onPressed: () => _scrollTo(key),
-        backgroundColor: BaycelColors.crimsonLight.withValues(alpha: 0.1),
-        side: BorderSide.none,
-        padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.sm),
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        visualDensity: VisualDensity.compact,
-      ),
-    );
-  }
+  final _deliveryMgmtKey = GlobalKey();
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadUserName();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   void _loadUserName() async {
@@ -91,34 +79,18 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           SizedBox(height: BaycelSpacing.xxs),
           Text("Here's what's happening at Baycel Growcery today.",
             style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary)),
-          SizedBox(height: BaycelSpacing.md),
-          SizedBox(
-            height: 32,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                _buildJumpChip('Scanner', Icons.qr_code_scanner, _statsKey),
-                _buildJumpChip('Stats', Icons.grid_view_rounded, _statsKey),
-                _buildJumpChip('Absences', Icons.event_busy_outlined, _absencesKey),
-                _buildJumpChip('Cash Advances', Icons.request_quote_outlined, _cashAdvanceKey),
-                _buildJumpChip('Charts', Icons.bar_chart_rounded, _chartsKey),
-                _buildJumpChip('Top Products', Icons.leaderboard_outlined, _productsKey),
-                _buildJumpChip('Deliveries', Icons.local_shipping_outlined, _deliveriesKey),
-              ],
-            ),
-          ),
           SizedBox(height: BaycelSpacing.lg),
           _buildScannerSection(),
           SizedBox(height: BaycelSpacing.lg),
           KeyedSubtree(key: _statsKey, child: _buildStatGrid()),
-          SizedBox(height: BaycelSpacing.lg),
-          _buildPayrollSection(),
           SizedBox(height: BaycelSpacing.lg),
           KeyedSubtree(key: _absencesKey, child: _buildAbsenceForms()),
           SizedBox(height: BaycelSpacing.lg),
           KeyedSubtree(key: _cashAdvanceKey, child: _buildCashAdvanceApprovals()),
           SizedBox(height: BaycelSpacing.lg),
           KeyedSubtree(key: _chartsKey, child: _buildChartsRow()),
+          SizedBox(height: BaycelSpacing.lg),
+          KeyedSubtree(key: _deliveryMgmtKey, child: _buildDeliveryManagement()),
           SizedBox(height: BaycelSpacing.lg),
           _buildBottomRow(key: _productsKey, deliveriesKey: _deliveriesKey),
         ],
@@ -150,6 +122,22 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                   icon: Icons.document_scanner_outlined,
                   label: 'Scan Paper List',
                   onTap: () => _scanPaperList(),
+                ),
+              ),
+              SizedBox(width: BaycelSpacing.md),
+              Expanded(
+                child: _OwnerQuickActionCard(
+                  icon: Icons.inventory_2_outlined,
+                  label: 'Inventory',
+                  onTap: () => widget.onNavigate?.call(1),
+                ),
+              ),
+              SizedBox(width: BaycelSpacing.md),
+              Expanded(
+                child: _OwnerQuickActionCard(
+                  icon: Icons.local_shipping_outlined,
+                  label: 'Deliveries',
+                  onTap: () => widget.onNavigate?.call(2),
                 ),
               ),
             ],
@@ -184,47 +172,65 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
     );
   }
 
-  Widget _buildPayrollSection() {
-    return StreamBuilder<List<StoreUser>>(
-      stream: _firestore.getUsers(),
-      builder: (context, snapshot) {
-        final users = snapshot.data ?? [];
-        final employees = users.where((u) => u.role != UserRole.owner).toList();
-        return Container(
-          padding: EdgeInsets.all(BaycelSpacing.base),
-          decoration: BaycelComponents.card,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Payroll', style: BaycelTypography.headlineMd),
-                  SizedBox(
-                    height: 30,
-                    child: ElevatedButton.icon(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PayrollScreen())),
-                      icon: Icon(Icons.open_in_new, size: 14, color: Colors.white),
-                      label: Text('Manage', style: BaycelTypography.labelSm.copyWith(color: Colors.white, fontSize: 11)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: BaycelColors.crimson,
-                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BaycelRadius.md)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: BaycelSpacing.sm),
-              Text('${employees.length} employees on payroll',
-                style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary, fontSize: 12.5)),
-              SizedBox(height: BaycelSpacing.xs),
-              Text('Paydays: 7th & 15th of each month',
-                style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 11.5)),
+  Widget _buildDeliveryManagement() {
+    return Container(
+      padding: EdgeInsets.all(BaycelSpacing.base),
+      decoration: BaycelComponents.card,
+      child: Column(
+        children: [
+          TabBar(
+            controller: _tabController,
+            labelColor: BaycelColors.crimson,
+            unselectedLabelColor: BaycelColors.textMuted,
+            indicatorColor: BaycelColors.crimson,
+            indicatorSize: TabBarIndicatorSize.label,
+            labelStyle: BaycelTypography.label.copyWith(fontSize: 12.5),
+            unselectedLabelStyle: BaycelTypography.label.copyWith(fontSize: 12.5),
+            tabs: const [
+              Tab(text: 'Create Delivery'),
+              Tab(text: 'Verify Deliveries'),
             ],
           ),
-        );
-      },
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.5,
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                CreateDeliveryCard(
+                  firestore: _firestore,
+                  onSubmit: (supplier, items) async {
+                    try {
+                      final products = await _firestore.getProducts().first;
+                      final deliveryItems = items.map((entry) {
+                        final matched = products.where((p) => p.name.toLowerCase() == entry['name']!.toLowerCase()).toList();
+                        return DeliveryItem(
+                          productId: matched.isNotEmpty ? matched.first.id : '',
+                          productName: entry['name']!,
+                          expectedQuantity: int.parse(entry['qty']!),
+                          receivedQuantity: 0,
+                        );
+                      }).toList();
+                      await _firestore.addDelivery(Delivery(
+                        id: '',
+                        supplierName: supplier,
+                        items: deliveryItems,
+                        status: DeliveryStatus.pending,
+                        createdAt: DateTime.now(),
+                      ));
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Delivery created')));
+                    } catch (e) {
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to create delivery'), backgroundColor: BaycelColors.error),
+                      );
+                    }
+                  },
+                ),
+                VerifyDeliveriesCard(firestore: _firestore),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1361,7 +1367,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                 children: [
                   Text('Top Products This Week', style: BaycelTypography.headlineMd),
                   GestureDetector(
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => InventoryScreen(role: 'owner'))),
+                    onTap: () => widget.onNavigate?.call(1),
                     child: Text('View all', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.crimson, fontWeight: FontWeight.w600)),
                   ),
                 ],
@@ -1411,7 +1417,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                 children: [
                   Text('Recent Deliveries', style: BaycelTypography.headlineMd),
                   GestureDetector(
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DeliveryScreen())),
+                    onTap: () => widget.onNavigate?.call(2),
                     child: Text('View all', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.crimson, fontWeight: FontWeight.w600)),
                   ),
                 ],
