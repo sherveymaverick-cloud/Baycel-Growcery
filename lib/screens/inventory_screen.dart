@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../theme.dart';
 import '../widgets/shared_widgets.dart';
 import '../widgets/animated_widgets.dart';
 import '../services/firestore_service.dart';
 import '../models/product.dart';
+import '../models/stock_movement.dart';
 
 class InventoryScreen extends StatefulWidget {
-  const InventoryScreen({super.key});
+  final String? role;
+  const InventoryScreen({super.key, this.role});
 
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
@@ -18,12 +21,181 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   final List<String> _categories = [
     'All',
-    'Groceries & Canned',
+    'Canned Goods',
     'Beverages',
-    'Frozen & Dairy',
+    'Rice & Grains',
+    'Flour & Sugar',
+    'Cooking Oil & Condiments',
+    'Dairy & Eggs',
+    'Frozen Foods',
+    'Bread & Bakery',
     'Snacks',
-    'Household',
+    'Cleaning',
+    'Personal Care',
+    'Baby Products',
+    'Other',
   ];
+
+  bool get _canStockOut => widget.role == 'bodegero' || widget.role == 'merchandiser';
+  bool get _canStockIn => widget.role == 'bodegero' || widget.role == 'delivery_checker';
+
+  void _showStockOutDialog(Product product) {
+    int qty = 1;
+    final qtyController = TextEditingController(text: '1');
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text('Stock Out: ${product.name}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Current stock: ${product.stockQuantity} ${product.unit}', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted)),
+              SizedBox(height: BaycelSpacing.md),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      if (qty > 1) { qty--; qtyController.text = qty.toString(); setDialogState(() {}); }
+                    },
+                    child: Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(color: BaycelColors.error.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(BaycelRadius.sm)),
+                      child: Icon(Icons.remove, size: 18, color: BaycelColors.error),
+                    ),
+                  ),
+                  SizedBox(width: BaycelSpacing.md),
+                  SizedBox(
+                    width: 60,
+                    child: TextField(
+                      controller: qtyController,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      style: BaycelTypography.dataMono.copyWith(fontSize: 18),
+                      decoration: InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.zero, isDense: true),
+                      onChanged: (v) { final p = int.tryParse(v); if (p != null && p > 0) qty = p; },
+                    ),
+                  ),
+                  SizedBox(width: BaycelSpacing.md),
+                  GestureDetector(
+                    onTap: () { qty++; qtyController.text = qty.toString(); setDialogState(() {}); },
+                    child: Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(color: BaycelColors.success.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(BaycelRadius.sm)),
+                      child: Icon(Icons.add, size: 18, color: BaycelColors.success),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                final finalQty = int.tryParse(qtyController.text) ?? 0;
+                if (finalQty <= 0 || finalQty > product.stockQuantity) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Invalid quantity'), backgroundColor: BaycelColors.error));
+                  return;
+                }
+                final newBalance = product.stockQuantity - finalQty;
+                await _firestore.updateProduct(product.id, {'stockQuantity': newBalance});
+                await _firestore.addStockMovement(StockMovement(
+                  id: '', productId: product.id, productName: product.name,
+                  type: StockMovementType.stockOut, quantity: finalQty, balanceAfter: newBalance,
+                  performedBy: FirebaseAuth.instance.currentUser?.uid ?? '', createdAt: DateTime.now(),
+                ));
+                Navigator.pop(ctx);
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Stock-out recorded')));
+              },
+              style: BaycelComponents.buttonPrimary,
+              child: Text('Confirm', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showStockInDialog(Product product) {
+    int qty = 1;
+    final qtyController = TextEditingController(text: '1');
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text('Stock In: ${product.name}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Current stock: ${product.stockQuantity} ${product.unit}', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted)),
+              SizedBox(height: BaycelSpacing.md),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      if (qty > 1) { qty--; qtyController.text = qty.toString(); setDialogState(() {}); }
+                    },
+                    child: Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(color: BaycelColors.error.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(BaycelRadius.sm)),
+                      child: Icon(Icons.remove, size: 18, color: BaycelColors.error),
+                    ),
+                  ),
+                  SizedBox(width: BaycelSpacing.md),
+                  SizedBox(
+                    width: 60,
+                    child: TextField(
+                      controller: qtyController,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      style: BaycelTypography.dataMono.copyWith(fontSize: 18),
+                      decoration: InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.zero, isDense: true),
+                      onChanged: (v) { final p = int.tryParse(v); if (p != null && p > 0) qty = p; },
+                    ),
+                  ),
+                  SizedBox(width: BaycelSpacing.md),
+                  GestureDetector(
+                    onTap: () { qty++; qtyController.text = qty.toString(); setDialogState(() {}); },
+                    child: Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(color: BaycelColors.success.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(BaycelRadius.sm)),
+                      child: Icon(Icons.add, size: 18, color: BaycelColors.success),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                final finalQty = int.tryParse(qtyController.text) ?? 0;
+                if (finalQty <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Enter valid quantity'), backgroundColor: BaycelColors.error));
+                  return;
+                }
+                final newBalance = product.stockQuantity + finalQty;
+                await _firestore.updateProduct(product.id, {'stockQuantity': newBalance});
+                await _firestore.addStockMovement(StockMovement(
+                  id: '', productId: product.id, productName: product.name,
+                  type: StockMovementType.stockIn, quantity: finalQty, balanceAfter: newBalance,
+                  performedBy: FirebaseAuth.instance.currentUser?.uid ?? '', createdAt: DateTime.now(),
+                ));
+                Navigator.pop(ctx);
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Stock-in recorded')));
+              },
+              style: BaycelComponents.buttonPrimary,
+              child: Text('Confirm', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   List<Product> _filterProducts(List<Product> products) {
     if (_selectedCategory == 'All') return products;
@@ -88,12 +260,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
             ),
             SizedBox(width: BaycelSpacing.md),
-            ElevatedButton.icon(
-              style: BaycelComponents.buttonPrimary,
-              onPressed: _showAddProductDialog,
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Add Product'),
-            ),
+            if (widget.role == 'owner' || widget.role == 'manager')
+              ElevatedButton.icon(
+                style: BaycelComponents.buttonPrimary,
+                onPressed: _showAddProductDialog,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add Product'),
+              ),
           ],
         );
       },
@@ -107,8 +280,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final priceController = TextEditingController();
     final stockController = TextEditingController();
     final reorderController = TextEditingController();
-    String category = 'Groceries & Canned';
-    String unit = 'pcs';
+    String category = 'Canned Goods';
+    String unit = 'box';
 
     InputDecoration _fieldDeco(String hint) => BaycelComponents.input.copyWith(
       hintText: hint,
@@ -247,7 +420,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                             value: unit,
                             decoration: _fieldDeco(''),
                             style: BaycelTypography.body.copyWith(fontSize: 13),
-                            items: ['pcs', 'kg', 'L', 'pack', 'box'].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                            items: ['box', 'case', 'pack', 'sack', 'kg', 'L', 'bottle', 'carton', 'roll', 'dozen'].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
                             onChanged: (v) => unit = v ?? unit,
                           ),
                         ],
@@ -518,13 +691,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       child: SizedBox(
                         width: constraints.maxWidth,
                         child: Table(
-                          columnWidths: const {
+                          columnWidths: {
                             0: FlexColumnWidth(3),
                             1: FlexColumnWidth(2),
                             2: FlexColumnWidth(2),
                             3: FlexColumnWidth(1),
                             4: FlexColumnWidth(2),
                             5: FlexColumnWidth(2),
+                            if (_canStockIn || _canStockOut) 6: FlexColumnWidth(2),
                           },
                           children: [
                             TableRow(
@@ -536,6 +710,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                 _buildTh('STOCK'),
                                 _buildTh('UNIT PRICE'),
                                 _buildTh('STATUS'),
+                                if (_canStockIn || _canStockOut) _buildTh('ACTIONS'),
                               ],
                             ),
                             ...products.map((product) => _buildTr(product)),
@@ -608,6 +783,34 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ),
           ),
         ),
+        if (_canStockIn || _canStockOut)
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.sm, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_canStockIn)
+                  GestureDetector(
+                    onTap: () => _showStockInDialog(product),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(color: BaycelColors.success.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(BaycelRadius.sm)),
+                      child: Text('Stock In', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.success, fontWeight: FontWeight.w600, fontSize: 11)),
+                    ),
+                  ),
+                if (_canStockIn && _canStockOut) SizedBox(width: 4),
+                if (_canStockOut)
+                  GestureDetector(
+                    onTap: () => _showStockOutDialog(product),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(color: BaycelColors.error.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(BaycelRadius.sm)),
+                      child: Text('Stock Out', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.error, fontWeight: FontWeight.w600, fontSize: 11)),
+                    ),
+                  ),
+              ],
+            ),
+          ),
       ],
     );
   }

@@ -33,6 +33,7 @@ class CashierDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         _SalesCounterCard(onSubmit: onSubmitSales),
         SizedBox(height: BaycelSpacing.md),

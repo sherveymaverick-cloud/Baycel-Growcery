@@ -112,6 +112,14 @@ class FirestoreService {
     }
   }
 
+  Future<void> updateProduct(String id, Map<String, dynamic> data) async {
+    try {
+      await _products.doc(id).update(data);
+    } catch (e) {
+      throw Exception('Failed to update product. Please try again.');
+    }
+  }
+
   Future<Product?> getProductById(String id) async {
     final doc = await _products.doc(id).get();
     if (!doc.exists) return null;
@@ -230,19 +238,6 @@ class FirestoreService {
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
     return records.first;
-  }
-
-  Future<AttendanceRecord?> getTodaysAttendance(String employeeId) async {
-    final today = DateTime.now();
-    final dateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-    final query = await _attendance
-        .where('employeeId', isEqualTo: employeeId)
-        .where('date', isEqualTo: dateStr)
-        .limit(1)
-        .get();
-    if (query.docs.isEmpty) return null;
-    final doc = query.docs.first;
-    return AttendanceRecord.fromMap(doc.id, doc.data() as Map<String, dynamic>);
   }
 
   Future<AttendanceRecord?> getTodaysAttendance(String employeeId) async {

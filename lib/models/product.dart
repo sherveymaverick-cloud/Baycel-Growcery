@@ -55,7 +55,7 @@ class Product {
       price: (map['price'] ?? 0).toDouble(),
       stockQuantity: map['stockQuantity'] ?? map['quantity'] ?? 0,
       reorderLevel: map['reorderLevel'] ?? 0,
-      unit: map['unit'] ?? 'pcs',
+      unit: map['unit'] ?? 'box',
       isActive: map['isActive'] ?? true,
       createdAt: _toDate(map['createdAt']),
       updatedAt: _toDate(map['updatedAt']),

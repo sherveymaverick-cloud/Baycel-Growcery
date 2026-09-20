@@ -11,18 +11,19 @@ import '../models/attendance.dart';
 import '../models/absence_form.dart';
 import '../models/cash_advance.dart';
 import '../models/stock_movement.dart';
-import 'inventory_screen.dart';
-import 'delivery_screen.dart';
+import '../widgets/floor_staff_shared_widgets.dart';
 import 'floor_staff/delivery_scanner_screen.dart';
 
 class OwnerDashboard extends StatefulWidget {
-  const OwnerDashboard({super.key});
+  final void Function(int index)? onNavigate;
+
+  const OwnerDashboard({super.key, this.onNavigate});
 
   @override
   State<OwnerDashboard> createState() => _OwnerDashboardState();
 }
 
-class _OwnerDashboardState extends State<OwnerDashboard> {
+class _OwnerDashboardState extends State<OwnerDashboard> with TickerProviderStateMixin {
   final _firestore = FirestoreService();
   String _userName = 'Owner';
   bool _isProcessingAbsence = false;
@@ -37,32 +38,20 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
   final _chartsKey = GlobalKey();
   final _productsKey = GlobalKey();
   final _deliveriesKey = GlobalKey();
-
-  void _scrollTo(GlobalKey key) {
-    final ctx = key.currentContext;
-    if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-  }
-
-  Widget _buildJumpChip(String label, IconData icon, GlobalKey key) {
-    return Padding(
-      padding: EdgeInsets.only(right: BaycelSpacing.sm),
-      child: ActionChip(
-        avatar: Icon(icon, size: 16, color: BaycelColors.crimson),
-        label: Text(label, style: BaycelTypography.labelXs.copyWith(color: BaycelColors.crimson)),
-        onPressed: () => _scrollTo(key),
-        backgroundColor: BaycelColors.crimsonLight.withValues(alpha: 0.1),
-        side: BorderSide.none,
-        padding: EdgeInsets.symmetric(horizontal: BaycelSpacing.sm),
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        visualDensity: VisualDensity.compact,
-      ),
-    );
-  }
+  final _deliveryMgmtKey = GlobalKey();
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadUserName();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   void _loadUserName() async {
@@ -90,22 +79,6 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           SizedBox(height: BaycelSpacing.xxs),
           Text("Here's what's happening at Baycel Growcery today.",
             style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary)),
-          SizedBox(height: BaycelSpacing.md),
-          SizedBox(
-            height: 32,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                _buildJumpChip('Scanner', Icons.qr_code_scanner, _statsKey),
-                _buildJumpChip('Stats', Icons.grid_view_rounded, _statsKey),
-                _buildJumpChip('Absences', Icons.event_busy_outlined, _absencesKey),
-                _buildJumpChip('Cash Advances', Icons.request_quote_outlined, _cashAdvanceKey),
-                _buildJumpChip('Charts', Icons.bar_chart_rounded, _chartsKey),
-                _buildJumpChip('Top Products', Icons.leaderboard_outlined, _productsKey),
-                _buildJumpChip('Deliveries', Icons.local_shipping_outlined, _deliveriesKey),
-              ],
-            ),
-          ),
           SizedBox(height: BaycelSpacing.lg),
           _buildScannerSection(),
           SizedBox(height: BaycelSpacing.lg),
@@ -116,6 +89,8 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           KeyedSubtree(key: _cashAdvanceKey, child: _buildCashAdvanceApprovals()),
           SizedBox(height: BaycelSpacing.lg),
           KeyedSubtree(key: _chartsKey, child: _buildChartsRow()),
+          SizedBox(height: BaycelSpacing.lg),
+          KeyedSubtree(key: _deliveryMgmtKey, child: _buildDeliveryManagement()),
           SizedBox(height: BaycelSpacing.lg),
           _buildBottomRow(key: _productsKey, deliveriesKey: _deliveriesKey),
         ],
@@ -149,6 +124,22 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                   onTap: () => _scanPaperList(),
                 ),
               ),
+              SizedBox(width: BaycelSpacing.md),
+              Expanded(
+                child: _OwnerQuickActionCard(
+                  icon: Icons.inventory_2_outlined,
+                  label: 'Inventory',
+                  onTap: () => widget.onNavigate?.call(1),
+                ),
+              ),
+              SizedBox(width: BaycelSpacing.md),
+              Expanded(
+                child: _OwnerQuickActionCard(
+                  icon: Icons.local_shipping_outlined,
+                  label: 'Deliveries',
+                  onTap: () => widget.onNavigate?.call(2),
+                ),
+              ),
             ],
           ),
         ],
@@ -176,6 +167,68 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         content: Text('Barcode scanner will open here. Point camera at barcode.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeliveryManagement() {
+    return Container(
+      padding: EdgeInsets.all(BaycelSpacing.base),
+      decoration: BaycelComponents.card,
+      child: Column(
+        children: [
+          TabBar(
+            controller: _tabController,
+            labelColor: BaycelColors.crimson,
+            unselectedLabelColor: BaycelColors.textMuted,
+            indicatorColor: BaycelColors.crimson,
+            indicatorSize: TabBarIndicatorSize.label,
+            labelStyle: BaycelTypography.label.copyWith(fontSize: 12.5),
+            unselectedLabelStyle: BaycelTypography.label.copyWith(fontSize: 12.5),
+            tabs: const [
+              Tab(text: 'Create Delivery'),
+              Tab(text: 'Verify Deliveries'),
+            ],
+          ),
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.5,
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                CreateDeliveryCard(
+                  firestore: _firestore,
+                  onSubmit: (supplier, items) async {
+                    try {
+                      final products = await _firestore.getProducts().first;
+                      final deliveryItems = items.map((entry) {
+                        final matched = products.where((p) => p.name.toLowerCase() == entry['name']!.toLowerCase()).toList();
+                        return DeliveryItem(
+                          productId: matched.isNotEmpty ? matched.first.id : '',
+                          productName: entry['name']!,
+                          expectedQuantity: int.parse(entry['qty']!),
+                          receivedQuantity: 0,
+                        );
+                      }).toList();
+                      await _firestore.addDelivery(Delivery(
+                        id: '',
+                        supplierName: supplier,
+                        items: deliveryItems,
+                        status: DeliveryStatus.pending,
+                        createdAt: DateTime.now(),
+                      ));
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Delivery created')));
+                    } catch (e) {
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to create delivery'), backgroundColor: BaycelColors.error),
+                      );
+                    }
+                  },
+                ),
+                VerifyDeliveriesCard(firestore: _firestore),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -400,6 +453,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
     }
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           margin: EdgeInsets.only(bottom: BaycelSpacing.sm),
@@ -1165,10 +1219,9 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                 ],
               ),
               SizedBox(height: BaycelSpacing.base),
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: entries.map((e) {
                       final pct = maxVal > 0 ? e.value / maxVal : 0.0;
@@ -1206,7 +1259,6 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                     }).toList(),
                   ),
                 ),
-              ),
             ],
           ),
         );
@@ -1238,34 +1290,30 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                 style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted)),
               SizedBox(height: BaycelSpacing.base),
               if (catCount.isEmpty)
-                Expanded(
-                  child: Center(
-                    child: Text('No data', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)),
-                  ),
+                Center(
+                  child: Text('No data', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)),
                 )
               else
-                Expanded(
-                  child: Column(
-                    children: [
-                      ...catCount.entries.toList().asMap().entries.map((e) {
-                        final name = e.value.key;
-                        final count = e.value.value;
-                        final color = colors[e.key % colors.length];
-                        final pct = total > 0 ? (count / total * 100).round() : 0;
-                        return Padding(
-                          padding: EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            children: [
-                              Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-                              SizedBox(width: BaycelSpacing.sm),
-                              Expanded(child: Text(name, style: BaycelTypography.bodySm)),
-                              Text('$pct%', style: BaycelTypography.bodySm.copyWith(fontWeight: FontWeight.w500)),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
+                Column(
+                  children: [
+                    ...catCount.entries.toList().asMap().entries.map((e) {
+                      final name = e.value.key;
+                      final count = e.value.value;
+                      final color = colors[e.key % colors.length];
+                      final pct = total > 0 ? (count / total * 100).round() : 0;
+                      return Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                            SizedBox(width: BaycelSpacing.sm),
+                            Expanded(child: Text(name, style: BaycelTypography.bodySm)),
+                            Text('$pct%', style: BaycelTypography.bodySm.copyWith(fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
                 ),
             ],
           ),
@@ -1319,18 +1367,17 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                 children: [
                   Text('Top Products This Week', style: BaycelTypography.headlineMd),
                   GestureDetector(
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryScreen())),
+                    onTap: () => widget.onNavigate?.call(1),
                     child: Text('View all', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.crimson, fontWeight: FontWeight.w600)),
                   ),
                 ],
               ),
               SizedBox(height: BaycelSpacing.sm),
               if (top.isEmpty)
-                Expanded(child: Center(child: Text('No products', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled))))
+                Center(child: Text('No products', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)))
               else
-                Expanded(
-                  child: Column(
-                    children: top.asMap().entries.map((e) {
+                Column(
+                  children: top.asMap().entries.map((e) {
                       final p = e.value;
                       final revenue = p.stockQuantity * p.price;
                       return StaggeredItem(
@@ -1345,7 +1392,6 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                       );
                     }).toList(),
                   ),
-                ),
             ],
           ),
         );
@@ -1371,26 +1417,25 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                 children: [
                   Text('Recent Deliveries', style: BaycelTypography.headlineMd),
                   GestureDetector(
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DeliveryScreen())),
+                    onTap: () => widget.onNavigate?.call(2),
                     child: Text('View all', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.crimson, fontWeight: FontWeight.w600)),
                   ),
                 ],
               ),
               SizedBox(height: BaycelSpacing.sm),
               if (recent.isEmpty)
-                Expanded(child: Center(child: Padding(
+                Center(child: Padding(
                   padding: EdgeInsets.all(BaycelSpacing.xl),
                   child: Text('No deliveries yet', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)),
-                )))
+                ))
               else
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: SizedBox(
-                          width: constraints.maxWidth,
-                          child: Table(
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SizedBox(
+                        width: constraints.maxWidth,
+                        child: Table(
                             columnWidths: {
                               0: FlexColumnWidth(3),
                               1: FlexColumnWidth(2),
@@ -1411,7 +1456,6 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                       );
                     },
                   ),
-                ),
             ],
           ),
         );
