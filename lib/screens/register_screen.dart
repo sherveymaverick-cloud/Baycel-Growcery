@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
+import '../services/firestore_service.dart';
 import '../theme.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -25,6 +26,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   int _selectedPayday = 7;
   String _scheduleStart = '08:00';
   String _scheduleEnd = '17:00';
+  List<String> _selectedProducts = [];
 
   static const _roles = [
     ('owner', 'Owner', Color(0xFFC62828)),
@@ -98,7 +100,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         'payday': _selectedPayday,
         'schedule': {'start': _scheduleStart, 'end': _scheduleEnd},
         'rfidCardUID': '',
-        'assignedProducts': [],
+        'assignedProducts': _selectedRole == 'merchandiser' ? _selectedProducts : [],
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -359,6 +361,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Widget _buildEmploymentSection() {
+    if (_selectedRole == 'owner') return const SizedBox.shrink();
+    if (_selectedRole == 'merchandiser') return _buildProductAssignmentSection();
     return _SectionCard(
       title: 'Employment',
       children: [
@@ -369,6 +373,67 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _label('Payday'),
         SizedBox(height: BaycelSpacing.xs),
         _buildPaydaySelector(),
+      ],
+    );
+  }
+
+  Widget _buildProductAssignmentSection() {
+    return _SectionCard(
+      title: 'Product Assignment',
+      children: [
+        _label('Select products this merchandiser is assigned to'),
+        SizedBox(height: BaycelSpacing.xs),
+        StreamBuilder<List<Map<String, dynamic>>>(
+          stream: FirestoreService().getProducts().map((products) =>
+            products.map((p) => {'id': p.id, 'name': p.name}).toList()),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return CircularProgressIndicator(color: BaycelColors.crimson);
+            }
+            final products = snapshot.data ?? [];
+            if (products.isEmpty) {
+              return Text('No products available', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled));
+            }
+            return ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: 200),
+              child: Container(
+                padding: EdgeInsets.all(BaycelSpacing.sm),
+                decoration: BoxDecoration(
+                  color: BaycelColors.surface,
+                  borderRadius: BorderRadius.circular(BaycelRadius.md),
+                  border: Border.all(color: BaycelColors.divider),
+                ),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: products.length,
+                  itemBuilder: (context, index) {
+                    final product = products[index];
+                    final isSelected = _selectedProducts.contains(product['id']);
+                    return CheckboxListTile(
+                      value: isSelected,
+                      onChanged: (v) {
+                        setState(() {
+                          if (v == true) {
+                            _selectedProducts.add(product['id']!);
+                          } else {
+                            _selectedProducts.remove(product['id']);
+                          }
+                        });
+                      },
+                      title: Text(product['name']!, style: BaycelTypography.bodySm.copyWith(fontSize: 12.5)),
+                      activeColor: BaycelColors.crimson,
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+        ),
+        SizedBox(height: BaycelSpacing.xs),
+        Text('${_selectedProducts.length} products selected',
+          style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textMuted, fontSize: 11)),
       ],
     );
   }
@@ -409,6 +474,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       controller: _nameController,
       textCapitalization: TextCapitalization.words,
       style: BaycelTypography.body.copyWith(fontSize: 13),
+      maxLength: 100,
       decoration: _fieldDeco(
         hintText: 'Juan Dela Cruz',
         prefixIcon: Padding(
@@ -418,6 +484,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
       validator: (v) {
         if (v == null || v.trim().isEmpty) return 'Enter the employee\'s full name.';
+        if (v.trim().length < 2) return 'Name must be at least 2 characters';
         return null;
       },
     );
@@ -429,6 +496,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       keyboardType: TextInputType.emailAddress,
       textCapitalization: TextCapitalization.none,
       style: BaycelTypography.body.copyWith(fontSize: 13),
+      maxLength: 100,
       decoration: _fieldDeco(
         hintText: 'name@baycel.com',
         prefixIcon: Padding(
@@ -449,6 +517,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       controller: _passwordController,
       obscureText: _obscurePassword,
       style: BaycelTypography.body.copyWith(fontSize: 13),
+      maxLength: 128,
       onChanged: (_) => setState(() {}),
       decoration: _fieldDeco(
         hintText: 'At least 6 characters',
@@ -463,6 +532,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
       validator: (v) {
         if (v == null || v.length < 6) return 'Password must be at least 6 characters.';
+        if (!RegExp(r'[A-Z]').hasMatch(v)) return 'Include at least 1 uppercase letter.';
+        if (!RegExp(r'[0-9]').hasMatch(v)) return 'Include at least 1 number.';
         return null;
       },
     );
@@ -473,6 +544,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       controller: _confirmPasswordController,
       obscureText: _obscureConfirmPassword,
       style: BaycelTypography.body.copyWith(fontSize: 13),
+      maxLength: 128,
       decoration: _fieldDeco(
         hintText: 'Re-enter your password',
         prefixIcon: Padding(
@@ -563,6 +635,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       controller: _rateController,
       keyboardType: TextInputType.number,
       style: BaycelTypography.body.copyWith(fontSize: 13),
+      maxLength: 10,
       decoration: _fieldDeco(
         hintText: '0.00',
         prefixIcon: Padding(
@@ -617,13 +690,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final current = _parseTime(isStart ? _scheduleStart : _scheduleEnd);
     final picked = await showTimePicker(context: context, initialTime: current);
     if (picked != null) {
-      setState(() {
-        if (isStart) {
-          _scheduleStart = _formatTime(picked);
-        } else {
-          _scheduleEnd = _formatTime(picked);
+      final pickedTime = _formatTime(picked);
+      if (isStart) {
+        setState(() => _scheduleStart = pickedTime);
+      } else {
+        final startParts = _scheduleStart.split(':');
+        final endParts = pickedTime.split(':');
+        final startMin = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
+        final endMin = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+        if (endMin <= startMin) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('End time must be after start time'), backgroundColor: BaycelColors.error),
+          );
+          return;
         }
-      });
+        setState(() => _scheduleEnd = pickedTime);
+      }
     }
   }
 

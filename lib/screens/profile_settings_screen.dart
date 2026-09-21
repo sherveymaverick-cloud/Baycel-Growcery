@@ -6,7 +6,6 @@ import '../widgets/animated_widgets.dart';
 import '../services/firestore_service.dart';
 import '../models/user.dart';
 import '../models/settings.dart';
-import 'permissions_screen.dart';
 
 class ProfileSettingsScreen extends StatefulWidget {
   const ProfileSettingsScreen({super.key});
@@ -354,9 +353,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         SizedBox(height: BaycelSpacing.base),
         // Roles & Permissions
         StaggeredItem(index: 4, child: _buildRolePermissionsCard()),
-        SizedBox(height: BaycelSpacing.base),
-        // App Permissions
-        StaggeredItem(index: 5, child: _buildPermissionsCard('owner')),
       ],
     );
   }
@@ -564,8 +560,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         StaggeredItem(index: 2, child: _buildManagerNotificationsCard()),
         SizedBox(height: BaycelSpacing.base),
         StaggeredItem(index: 3, child: _buildSecurityCard()),
-        SizedBox(height: BaycelSpacing.base),
-        StaggeredItem(index: 4, child: _buildPermissionsCard('manager')),
       ],
     );
   }
@@ -632,8 +626,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         StaggeredItem(index: 2, child: _buildFloorStaffNotificationsCard(role)),
         SizedBox(height: BaycelSpacing.base),
         StaggeredItem(index: 3, child: _buildSecurityCard()),
-        SizedBox(height: BaycelSpacing.base),
-        StaggeredItem(index: 4, child: _buildPermissionsCard(role)),
       ],
     );
   }
@@ -817,44 +809,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPermissionsCard(String role) {
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => PermissionsScreen(role: role)),
-      ),
-      child: Container(
-        decoration: BaycelComponents.card,
-        padding: EdgeInsets.all(BaycelSpacing.base),
-        child: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: BaycelColors.crimson.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(BaycelRadius.md),
-              ),
-              child: Icon(Icons.security_outlined, color: BaycelColors.crimson, size: 20),
-            ),
-            SizedBox(width: BaycelSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('App Permissions', style: BaycelTypography.headlineMd.copyWith(fontSize: 15)),
-                  SizedBox(height: BaycelSpacing.xxs),
-                  Text('Manage camera and notification permissions',
-                    style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 12)),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right, size: 20, color: BaycelColors.textMuted),
           ],
         ),
       ),

@@ -316,12 +316,38 @@ class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
 
   void _handleConfirmDelivery(String deliveryId) async {
     try {
+      final deliveries = await _firestore.getDeliveries().first;
+      final delivery = deliveries.where((d) => d.id == deliveryId).firstOrNull;
+      if (delivery == null) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Delivery not found'), backgroundColor: BaycelColors.error));
+        return;
+      }
+
+      for (final item in delivery.items) {
+        final products = await _firestore.getProducts().first;
+        final product = products.where((p) => p.id == item.productId || p.name == item.productName).firstOrNull;
+        if (product != null) {
+          final newQty = product.stockQuantity + item.expectedQuantity;
+          await _firestore.updateProduct(product.id, {'stockQuantity': newQty});
+          await _firestore.addStockMovement(StockMovement(
+            id: '',
+            productId: product.id,
+            productName: product.name,
+            type: StockMovementType.stockIn,
+            quantity: item.expectedQuantity,
+            balanceAfter: newQty,
+            performedBy: FirebaseAuth.instance.currentUser?.uid ?? '',
+            createdAt: DateTime.now(),
+          ));
+        }
+      }
+
       await _firestore.updateDelivery(deliveryId, {
         'status': 'delivered',
         'receivedBy': FirebaseAuth.instance.currentUser?.uid,
         'receivedAt': DateTime.now(),
       });
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Delivery confirmed')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Delivery confirmed and stock updated')));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -339,12 +365,21 @@ class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
       }
       final products = await _firestore.getProducts().first;
       final product = products.where((p) => p.name == productName).firstOrNull;
-      final currentStock = product?.stockQuantity ?? 0;
-      final newBalance = (currentStock - qty).clamp(0, currentStock);
+      if (product == null) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Product not found'), backgroundColor: BaycelColors.error));
+        return;
+      }
+      final currentStock = product.stockQuantity;
+      if (qty > currentStock) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Insufficient stock ($currentStock available)'), backgroundColor: BaycelColors.error));
+        return;
+      }
+      final newBalance = currentStock - qty;
 
+      await _firestore.updateProduct(product.id, {'stockQuantity': newBalance});
       await _firestore.addStockMovement(StockMovement(
         id: '',
-        productId: product?.id ?? '',
+        productId: product.id,
         productName: productName,
         type: StockMovementType.stockOut,
         quantity: qty,
@@ -460,6 +495,7 @@ class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
           cashAdvancesStream: _firestore.getCashAdvancesByUser(FirebaseAuth.instance.currentUser?.uid ?? ''),
           onConfirmDelivery: _handleConfirmDelivery,
           onStockOut: _handleStockOut,
+          onCreateDelivery: _handleDeliveryCreation,
         ),
       ];
       case 'delivery_checker': return [
@@ -480,7 +516,7 @@ class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
           productsStream: _firestore.getProducts(),
           stockMovementsStream: _firestore.getStockMovements(),
           onStockOut: _handleStockOut,
-          cashAdvancesStream: _firestore.getCashAdvancesByUser(FirebaseAuth.instance.currentUser?.uid ?? ''),
+          onSubmitAbsence: _handleAbsenceSubmission,
         ),
       ];
       default: return [

@@ -33,6 +33,7 @@ class CashierDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         _SalesCounterCard(onSubmit: onSubmitSales),
         SizedBox(height: BaycelSpacing.md),
@@ -375,9 +376,20 @@ class _SalesCounterCardState extends State<_SalesCounterCard> {
                             : now,
                         );
                         if (picked != null) {
-                          setModalState(() {
-                            _shiftEnd = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
-                          });
+                          final endStr = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                          if (_shiftStart.isNotEmpty) {
+                            final startParts = _shiftStart.split(':');
+                            final endParts = endStr.split(':');
+                            final startMin = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
+                            final endMin = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+                            if (endMin <= startMin) {
+                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('End time must be after start time'), backgroundColor: BaycelColors.error),
+                              );
+                              return;
+                            }
+                          }
+                          setModalState(() => _shiftEnd = endStr);
                         }
                       },
                       child: Container(

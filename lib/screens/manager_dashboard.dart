@@ -10,23 +10,40 @@ import '../models/delivery.dart';
 import '../models/user.dart';
 import '../models/attendance.dart';
 import '../models/cash_advance.dart';
+import '../models/absence_form.dart';
+import '../widgets/floor_staff_helpers.dart';
 import 'floor_staff/delivery_scanner_screen.dart';
 
 class ManagerDashboard extends StatefulWidget {
-  const ManagerDashboard({super.key});
+  final void Function(int index)? onNavigate;
+
+  const ManagerDashboard({super.key, this.onNavigate});
 
   @override
   State<ManagerDashboard> createState() => _ManagerDashboardState();
 }
 
-class _ManagerDashboardState extends State<ManagerDashboard> {
+class _ManagerDashboardState extends State<ManagerDashboard> with TickerProviderStateMixin {
   final _firestore = FirestoreService();
   String _userName = 'Manager';
+  bool _isClockedIn = false;
+  bool _isOnBreak = false;
+  String _clockTime = '';
+  String _todayAttendanceId = '';
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadUserName();
+    _restoreClockInState();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   void _loadUserName() async {
@@ -43,6 +60,120 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
     return 'Good evening';
   }
 
+  void _restoreClockInState() async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+      if (uid.isEmpty) return;
+      final today = await _firestore.getTodaysAttendance(uid);
+      if (today != null && today.timeOut == null && mounted) {
+        final onBreak = today.timeOut2 != null && today.timeIn2 == null;
+        setState(() {
+          _isClockedIn = true;
+          _isOnBreak = onBreak;
+          _todayAttendanceId = today.id;
+          _clockTime = onBreak ? 'On break since ${today.timeOut2}' : 'Since ${today.timeIn}';
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to restore clock-in state: $e');
+    }
+  }
+
+  void _toggleClockIn() async {
+    try {
+      final now = DateTime.now();
+      final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+      final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+      if (uid.isEmpty) return;
+
+      if (!_isClockedIn) {
+        final ref = await _firestore.addAttendanceAndReturnId(AttendanceRecord(
+          id: '',
+          employeeId: uid,
+          date: dateStr,
+          timeIn: timeStr,
+          totalHours: 0,
+          status: AttendanceStatus.present,
+        ));
+        if (mounted) {
+          setState(() {
+            _isClockedIn = true;
+            _todayAttendanceId = ref;
+            _clockTime = 'Since $timeStr';
+          });
+        }
+      } else {
+        if (_todayAttendanceId.isNotEmpty) {
+          final today = await _firestore.getTodaysAttendance(uid);
+          final timeInStr = today?.timeIn ?? _clockTime.replaceFirst('Since ', '');
+          final timeInParts = timeInStr.split(':');
+          final timeOutParts = timeStr.split(':');
+          final inMinutes = int.parse(timeInParts[0]) * 60 + int.parse(timeInParts[1]);
+          final outMinutes = int.parse(timeOutParts[0]) * 60 + int.parse(timeOutParts[1]);
+          final totalHours = (outMinutes - inMinutes) / 60.0;
+
+          final updateData = <String, dynamic>{
+            'timeOut': timeStr,
+            'totalHours': totalHours,
+            'status': 'complete',
+          };
+          if (_isOnBreak && today != null && (today.timeIn2 == null || today.timeIn2!.isEmpty)) {
+            updateData['timeIn2'] = timeStr;
+          }
+          await _firestore.updateAttendance(_todayAttendanceId, updateData);
+        }
+        if (mounted) {
+          setState(() {
+            _isClockedIn = false;
+            _isOnBreak = false;
+            _todayAttendanceId = '';
+            _clockTime = '';
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Clock in/out error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Clock in/out failed: $e'), backgroundColor: BaycelColors.error),
+        );
+      }
+    }
+  }
+
+  void _toggleBreak() async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+      if (uid.isEmpty) return;
+      final now = DateTime.now();
+      final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+      final today = await _firestore.getTodaysAttendance(uid);
+      if (today == null || today.timeOut != null) return;
+
+      if (!_isOnBreak) {
+        await _firestore.updateAttendance(today.id, {'timeOut2': timeStr});
+        setState(() {
+          _isOnBreak = true;
+          _clockTime = 'On break since $timeStr';
+        });
+      } else {
+        await _firestore.updateAttendance(today.id, {'timeIn2': timeStr});
+        setState(() {
+          _isOnBreak = false;
+          _clockTime = 'Since ${today.timeIn}';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to toggle break. Try again.'), backgroundColor: BaycelColors.error),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -55,11 +186,21 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
           Text('Store operations overview for Baycel Growcery.',
             style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary)),
           SizedBox(height: BaycelSpacing.lg),
+          ClockCard(
+            isClockedIn: _isClockedIn,
+            isOnBreak: _isOnBreak,
+            clockTime: _clockTime,
+            onToggleClockIn: _toggleClockIn,
+            onToggleBreak: _toggleBreak,
+          ),
+          SizedBox(height: BaycelSpacing.lg),
           _buildScannerSection(),
           SizedBox(height: BaycelSpacing.lg),
           _buildStatGrid(),
           SizedBox(height: BaycelSpacing.lg),
           _buildChartsRow(),
+          SizedBox(height: BaycelSpacing.lg),
+          _buildDeliveryManagement(),
           SizedBox(height: BaycelSpacing.lg),
           _buildBottomRow(),
           SizedBox(height: BaycelSpacing.lg),
@@ -85,6 +226,29 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
           }),
           SizedBox(height: BaycelSpacing.lg),
           MyRequestsCard(requestsStream: _firestore.getCashAdvancesByUser(FirebaseAuth.instance.currentUser?.uid ?? '')),
+          SizedBox(height: BaycelSpacing.lg),
+          _AbsenceFormCard(onSubmit: (startDate, endDate, reason) async {
+            try {
+              final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+              final user = await _firestore.getCurrentUser();
+              await _firestore.addAbsenceForm(AbsenceForm(
+                id: '',
+                employeeId: uid,
+                employeeName: user?.name ?? _userName,
+                reason: reason,
+                startDate: startDate,
+                endDate: endDate,
+                submittedAt: DateTime.now(),
+              ));
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Absence request submitted')));
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Unable to submit request'), backgroundColor: BaycelColors.error),
+                );
+              }
+            }
+          }),
         ],
       ),
     );
@@ -116,6 +280,22 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
                   onTap: () => _scanPaperList(),
                 ),
               ),
+              SizedBox(width: BaycelSpacing.md),
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.inventory_2_outlined,
+                  label: 'Inventory',
+                  onTap: () => widget.onNavigate?.call(1),
+                ),
+              ),
+              SizedBox(width: BaycelSpacing.md),
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.local_shipping_outlined,
+                  label: 'Deliveries',
+                  onTap: () => widget.onNavigate?.call(2),
+                ),
+              ),
             ],
           ),
         ],
@@ -136,14 +316,23 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
   }
 
   void _scanBarcode() {
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Barcode Scanner'),
-        content: Text('Barcode scanner will open here. Point camera at barcode.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Close')),
-        ],
+      isScrollControlled: true,
+      builder: (ctx) => BarcodeScannerSheet(
+        onScanned: (code) async {
+          Navigator.pop(ctx);
+          final product = await _firestore.getProductByBarcode(code);
+          if (product != null) {
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('${product.name} found')),
+            );
+          } else {
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('No product found for: $code'), backgroundColor: BaycelColors.marigoldDark),
+            );
+          }
+        },
       ),
     );
   }
@@ -280,8 +469,8 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
                 return LayoutBuilder(
                   builder: (context, constraints) {
                     if (constraints.maxWidth < 700) {
-                      return SizedBox(
-                        height: 320,
+                      return ConstrainedBox(
+                        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.4),
                         child: Column(
                           children: [
                             _buildStockChart(categories),
@@ -415,9 +604,71 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
                       ),
                     ),
                   );
-                }),
+                  }),
+                ),
               ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeliveryManagement() {
+    return Container(
+      padding: EdgeInsets.all(BaycelSpacing.base),
+      decoration: BaycelComponents.card,
+      child: Column(
+        children: [
+          TabBar(
+            controller: _tabController,
+            labelColor: BaycelColors.crimson,
+            unselectedLabelColor: BaycelColors.textMuted,
+            indicatorColor: BaycelColors.crimson,
+            indicatorSize: TabBarIndicatorSize.label,
+            labelStyle: BaycelTypography.label.copyWith(fontSize: 12.5),
+            unselectedLabelStyle: BaycelTypography.label.copyWith(fontSize: 12.5),
+            tabs: const [
+              Tab(text: 'Create Delivery'),
+              Tab(text: 'Verify Deliveries'),
+            ],
+          ),
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.5,
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                CreateDeliveryCard(
+                  firestore: _firestore,
+                  onSubmit: (supplier, items) async {
+                    try {
+                      final products = await _firestore.getProducts().first;
+                      final deliveryItems = items.map((entry) {
+                        final matched = products.where((p) => p.name.toLowerCase() == entry['name']!.toLowerCase()).toList();
+                        return DeliveryItem(
+                          productId: matched.isNotEmpty ? matched.first.id : '',
+                          productName: entry['name']!,
+                          expectedQuantity: int.parse(entry['qty']!),
+                          receivedQuantity: 0,
+                        );
+                      }).toList();
+                      await _firestore.addDelivery(Delivery(
+                        id: '',
+                        supplierName: supplier,
+                        items: deliveryItems,
+                        status: DeliveryStatus.pending,
+                        createdAt: DateTime.now(),
+                      ));
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Delivery created')));
+                    } catch (e) {
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to create delivery'), backgroundColor: BaycelColors.error),
+                      );
+                    }
+                  },
+                ),
+                VerifyDeliveriesCard(firestore: _firestore),
+              ],
             ),
+          ),
         ],
       ),
     );
@@ -478,7 +729,10 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Needs Reordering', style: BaycelTypography.headlineMd),
-              Text('View all', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textSecondary, fontWeight: FontWeight.w600)),
+              GestureDetector(
+                onTap: () => widget.onNavigate?.call(1),
+                child: Text('View all', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.crimson, fontWeight: FontWeight.w600)),
+              ),
             ],
           ),
           SizedBox(height: BaycelSpacing.sm),
@@ -515,7 +769,10 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Deliveries Awaiting Verification', style: BaycelTypography.headlineMd),
-              Text('View all', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textSecondary, fontWeight: FontWeight.w600)),
+              GestureDetector(
+                onTap: () => widget.onNavigate?.call(2),
+                child: Text('View all', style: BaycelTypography.labelSm.copyWith(color: BaycelColors.crimson, fontWeight: FontWeight.w600)),
+              ),
             ],
           ),
           SizedBox(height: BaycelSpacing.sm),
@@ -703,6 +960,132 @@ class _QuickActionCard extends StatelessWidget {
             Text(label, style: BaycelTypography.labelSm.copyWith(fontWeight: FontWeight.w600), textAlign: TextAlign.center),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AbsenceFormCard extends StatefulWidget {
+  final void Function(DateTime startDate, DateTime endDate, String reason) onSubmit;
+
+  const _AbsenceFormCard({required this.onSubmit});
+
+  @override
+  State<_AbsenceFormCard> createState() => _AbsenceFormCardState();
+}
+
+class _AbsenceFormCardState extends State<_AbsenceFormCard> {
+  DateTime? _startDate;
+  DateTime? _endDate;
+  final _reasonController = TextEditingController();
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  void _pickDates() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: now,
+      lastDate: now.add(Duration(days: 365)),
+      initialDateRange: _startDate != null && _endDate != null
+        ? DateTimeRange(start: _startDate!, end: _endDate!)
+        : null,
+    );
+    if (picked != null) {
+      setState(() {
+        _startDate = picked.start;
+        _endDate = picked.end;
+      });
+    }
+  }
+
+  void _submit() {
+    final reason = _reasonController.text.trim();
+    if (_startDate == null || reason.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Select dates and enter a reason')));
+      return;
+    }
+    widget.onSubmit(_startDate!, _endDate ?? _startDate!, reason);
+    _reasonController.clear();
+    setState(() {
+      _startDate = null;
+      _endDate = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dateText = _startDate != null
+      ? _endDate != null && !_startDate!.isAtSameMomentAs(_endDate!)
+        ? '${_startDate!.month}/${_startDate!.day} \u2013 ${_endDate!.month}/${_endDate!.day}'
+        : '${_startDate!.month}/${_startDate!.day}'
+      : '';
+
+    return Container(
+      padding: EdgeInsets.all(BaycelSpacing.base),
+      decoration: BaycelComponents.card,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Submit Absence Form', style: BaycelTypography.title),
+          SizedBox(height: BaycelSpacing.xxs),
+          Text('Requests are reviewed by the Owner',
+            style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textMuted, fontSize: 11.5)),
+          SizedBox(height: BaycelSpacing.md),
+          buildFieldLabel('Date(s)'),
+          SizedBox(height: 5),
+          GestureDetector(
+            onTap: _pickDates,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: BaycelColors.card,
+                borderRadius: BorderRadius.circular(BaycelRadius.md),
+                border: Border.all(color: BaycelColors.divider),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.date_range, size: 18, color: BaycelColors.textSecondary),
+                  SizedBox(width: BaycelSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      dateText.isEmpty ? 'Select date range' : dateText,
+                      style: BaycelTypography.body.copyWith(
+                        fontSize: 13,
+                        color: dateText.isEmpty ? BaycelColors.textDisabled : BaycelColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, size: 16, color: BaycelColors.textDisabled),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: BaycelSpacing.md),
+          buildFieldLabel('Reason'),
+          SizedBox(height: 5),
+          TextField(
+            controller: _reasonController,
+            style: BaycelTypography.body.copyWith(fontSize: 13),
+            decoration: BaycelComponents.input.copyWith(
+              hintText: 'Brief reason for absence', filled: true, fillColor: BaycelColors.card),
+          ),
+          SizedBox(height: BaycelSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _submit,
+              style: BaycelComponents.buttonPrimary.copyWith(
+                padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: BaycelSpacing.buttonHorizontal, vertical: BaycelSpacing.buttonVertical)),
+              ),
+              child: Text('Submit Request', style: BaycelTypography.label.copyWith(color: Colors.white, fontSize: 12.5)),
+            ),
+          ),
+        ],
       ),
     );
   }

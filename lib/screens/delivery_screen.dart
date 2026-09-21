@@ -6,6 +6,7 @@ import '../widgets/shared_widgets.dart';
 import '../widgets/animated_widgets.dart';
 import '../services/firestore_service.dart';
 import '../models/delivery.dart';
+import '../models/stock_movement.dart';
 
 class DeliveryScreen extends StatefulWidget {
   const DeliveryScreen({super.key});
@@ -17,12 +18,20 @@ class DeliveryScreen extends StatefulWidget {
 class _DeliveryScreenState extends State<DeliveryScreen> {
   DeliveryStatus? _selectedFilter;
   final _firestore = FirestoreService();
+  final _db = FirebaseFirestore.instance;
   String _userRole = '';
+
+  List<Delivery> _deliveries = [];
+  DocumentSnapshot? _lastDoc;
+  bool _hasMore = true;
+  bool _isLoading = true;
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
     super.initState();
     _detectRole();
+    _loadInitialDeliveries();
   }
 
   void _detectRole() async {
@@ -38,175 +47,197 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     }
   }
 
+  Future<void> _loadInitialDeliveries() async {
+    setState(() => _isLoading = true);
+    final snap = await _db.collection('deliveries').orderBy('createdAt', descending: true).limit(20).get();
+    _deliveries = snap.docs.map((d) => Delivery.fromMap(d.id, d.data())).toList();
+    _lastDoc = snap.docs.isNotEmpty ? snap.docs.last : null;
+    _hasMore = snap.docs.length >= 20;
+    setState(() => _isLoading = false);
+  }
+
+  Future<void> _loadMoreDeliveries() async {
+    if (_lastDoc == null || _isLoadingMore) return;
+    setState(() => _isLoadingMore = true);
+    final snap = await _db.collection('deliveries')
+        .orderBy('createdAt', descending: true)
+        .startAfterDocument(_lastDoc!)
+        .limit(20)
+        .get();
+    _deliveries.addAll(snap.docs.map((d) => Delivery.fromMap(d.id, d.data())).toList());
+    _lastDoc = snap.docs.isNotEmpty ? snap.docs.last : _lastDoc;
+    _hasMore = snap.docs.length >= 20;
+    setState(() => _isLoadingMore = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.all(BaycelSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          StaggeredItem(index: 0, child: _buildHeader()),
-          SizedBox(height: BaycelSpacing.lg),
-          StaggeredItem(index: 1, child: _buildFilterChips()),
-          SizedBox(height: BaycelSpacing.lg),
-          Expanded(child: StaggeredItem(index: 2, child: _buildDeliveryTable())),
-        ],
-      ),
+      child: _isLoading
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Deliveries', style: BaycelTypography.display),
+                SizedBox(height: BaycelSpacing.xxs),
+                Text('Loading...', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary, fontSize: 12.5)),
+                SizedBox(height: BaycelSpacing.lg),
+                const Expanded(child: Center(child: SkeletonTable(rows: 6))),
+              ],
+            )
+          : _buildContent(),
     );
   }
 
-  Widget _buildHeader() {
-    return StreamBuilder<List<Delivery>>(
-      stream: _firestore.getDeliveries(),
-      builder: (context, snapshot) {
-        final count = snapshot.data?.length ?? 0;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Deliveries', style: BaycelTypography.display),
-            SizedBox(height: BaycelSpacing.xxs),
-            Text('$count deliveries logged today',
-              style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary, fontSize: 12.5)),
-          ],
-        );
-      },
-    );
-  }
+  Widget _buildContent() {
+    final count = _deliveries.length;
+    final filtered = _selectedFilter == null
+        ? _deliveries
+        : _deliveries.where((d) => d.status == _selectedFilter).toList();
+    final counts = {
+      null: _deliveries.length,
+      DeliveryStatus.delivered: _deliveries.where((d) => d.status == DeliveryStatus.delivered).length,
+      DeliveryStatus.pending: _deliveries.where((d) => d.status == DeliveryStatus.pending || d.status == DeliveryStatus.inTransit).length,
+      DeliveryStatus.discrepancy: _deliveries.where((d) => d.status == DeliveryStatus.discrepancy).length,
+    };
+    final filters = [
+      (label: 'All', status: null),
+      (label: 'Verified', status: DeliveryStatus.delivered),
+      (label: 'Pending', status: DeliveryStatus.pending),
+      (label: 'Discrepancy', status: DeliveryStatus.discrepancy),
+    ];
 
-  Widget _buildFilterChips() {
-    return StreamBuilder<List<Delivery>>(
-      stream: _firestore.getDeliveries(),
-      builder: (context, snapshot) {
-        final all = snapshot.data ?? [];
-        final counts = {
-          null: all.length,
-          DeliveryStatus.delivered: all.where((d) => d.status == DeliveryStatus.delivered).length,
-          DeliveryStatus.pending: all.where((d) => d.status == DeliveryStatus.pending || d.status == DeliveryStatus.inTransit).length,
-          DeliveryStatus.discrepancy: all.where((d) => d.status == DeliveryStatus.discrepancy).length,
-        };
-        final filters = [
-          (label: 'All', status: null),
-          (label: 'Verified', status: DeliveryStatus.delivered),
-          (label: 'Pending', status: DeliveryStatus.pending),
-          (label: 'Discrepancy', status: DeliveryStatus.discrepancy),
-        ];
-
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: filters.map((filter) {
-              final isSelected = _selectedFilter == filter.status;
-              final count = counts[filter.status] ?? 0;
-              return Padding(
-                padding: EdgeInsets.only(right: BaycelSpacing.sm),
-                child: ChoiceChip(
-                  label: Text('${filter.label} ($count)', style: BaycelTypography.labelSm.copyWith(
-                    color: isSelected ? Colors.white : BaycelColors.textPrimary,
-                  )),
-                  selected: isSelected,
-                  selectedColor: BaycelColors.crimson,
-                  backgroundColor: BaycelColors.card,
-                  side: BorderSide(
-                    color: isSelected ? BaycelColors.crimson : BaycelColors.divider,
-                  ),
-                  onSelected: (_) {
-                    setState(() => _selectedFilter = filter.status);
-                  },
-                ),
-              );
-            }).toList(),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildDeliveryTable() {
-    return StreamBuilder<List<Delivery>>(
-      stream: _firestore.getDeliveries(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: SkeletonTable(rows: 6));
-        }
-
-        if (snapshot.hasError) {
-          return Center(child: Text('Unable to load deliveries', style: BaycelTypography.body.copyWith(color: BaycelColors.textMuted)));
-        }
-
-        final deliveries = snapshot.data ?? [];
-        final filtered = _selectedFilter == null
-            ? deliveries
-            : deliveries.where((d) => d.status == _selectedFilter).toList();
-
-        if (filtered.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: BaycelSpacing.xxl),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.local_shipping_outlined, size: 40, color: BaycelColors.textDisabled),
-                  SizedBox(height: BaycelSpacing.sm),
-                  Text('No deliveries found', style: BaycelTypography.body.copyWith(color: BaycelColors.textMuted)),
-                ],
-              ),
-            ),
-          );
-        }
-
-        return Container(
-          decoration: BaycelComponents.card,
-          child: Column(
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: SizedBox(
-                      width: constraints.maxWidth,
-                      child: Table(
-                        columnWidths: const {
-                          0: FlexColumnWidth(3),
-                          1: FlexColumnWidth(2),
-                          2: FlexColumnWidth(1.5),
-                          3: FlexColumnWidth(2.5),
-                          4: FlexColumnWidth(2.5),
-                          5: FlexColumnWidth(2),
+              StaggeredItem(index: 0, child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Deliveries', style: BaycelTypography.display),
+                  SizedBox(height: BaycelSpacing.xxs),
+                  Text('$count deliveries logged',
+                    style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textSecondary, fontSize: 12.5)),
+                ],
+              )),
+              SizedBox(height: BaycelSpacing.lg),
+              StaggeredItem(index: 1, child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: filters.map((filter) {
+                    final isSelected = _selectedFilter == filter.status;
+                    final c = counts[filter.status] ?? 0;
+                    return Padding(
+                      padding: EdgeInsets.only(right: BaycelSpacing.sm),
+                      child: ChoiceChip(
+                        label: Text('${filter.label} ($c)', style: BaycelTypography.labelSm.copyWith(
+                          color: isSelected ? Colors.white : BaycelColors.textPrimary,
+                        )),
+                        selected: isSelected,
+                        selectedColor: BaycelColors.crimson,
+                        backgroundColor: BaycelColors.card,
+                        side: BorderSide(
+                          color: isSelected ? BaycelColors.crimson : BaycelColors.divider,
+                        ),
+                        onSelected: (_) {
+                          setState(() => _selectedFilter = filter.status);
                         },
-                        children: [
-                          TableRow(
-                            decoration: BoxDecoration(
-                              color: BaycelColors.surface,
-                              border: Border(bottom: BorderSide(color: BaycelColors.divider, width: 1)),
-                            ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              )),
+              SizedBox(height: BaycelSpacing.lg),
+              Expanded(
+                child: StaggeredItem(
+                  index: 2,
+                  child: filtered.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: BaycelSpacing.xxl),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              _buildTh('SUPPLIER'),
-                              _buildTh('DATE'),
-                              _buildTh('ITEMS'),
-                              _buildTh('RECEIVED BY'),
-                              _buildTh('STATUS'),
-                              _buildTh('ACTIONS'),
+                              Icon(Icons.local_shipping_outlined, size: 40, color: BaycelColors.textDisabled),
+                              SizedBox(height: BaycelSpacing.sm),
+                              Text('No deliveries found', style: BaycelTypography.body.copyWith(color: BaycelColors.textMuted)),
                             ],
                           ),
-                          ...filtered.map((d) => _buildTr(d)),
-                        ],
+                        ),
+                      )
+                    : Container(
+                        decoration: BaycelComponents.card,
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.vertical,
+                                child: LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    return SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: SizedBox(
+                                        width: constraints.maxWidth < 900 ? 900 : constraints.maxWidth,
+                                        child: Table(
+                                          columnWidths: const {
+                                            0: FlexColumnWidth(3),
+                                            1: FlexColumnWidth(2),
+                                            2: FlexColumnWidth(1.5),
+                                            3: FlexColumnWidth(2.5),
+                                            4: FlexColumnWidth(2.5),
+                                            5: FlexColumnWidth(2),
+                                          },
+                                          children: [
+                                            TableRow(
+                                              decoration: BoxDecoration(
+                                                color: BaycelColors.surface,
+                                                border: Border(bottom: BorderSide(color: BaycelColors.divider, width: 1)),
+                                              ),
+                                              children: [
+                                                _buildTh('SUPPLIER'),
+                                                _buildTh('DATE'),
+                                                _buildTh('ITEMS'),
+                                                _buildTh('RECEIVED BY'),
+                                                _buildTh('STATUS'),
+                                                _buildTh('ACTIONS'),
+                                              ],
+                                            ),
+                                            ...filtered.map((d) => _buildTr(d)),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: EdgeInsets.symmetric(vertical: BaycelSpacing.sm),
+                              alignment: Alignment.center,
+                              child: Text('${filtered.length} of $count deliveries',
+                                style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textDisabled, fontSize: 11)),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                },
+                ),
               ),
-              if (filtered.length < 5)
-                Container(
-                  padding: EdgeInsets.symmetric(vertical: BaycelSpacing.xl),
-                  alignment: Alignment.center,
-                  child: Text('${filtered.length} of ${deliveries.length} deliveries',
-                    style: BaycelTypography.labelSm.copyWith(color: BaycelColors.textDisabled, fontSize: 11)),
+              if (_hasMore)
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: BaycelSpacing.base),
+                  child: Center(
+                    child: _isLoadingMore
+                        ? SizedBox(width: 20, height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: BaycelColors.crimson))
+                        : GestureDetector(
+                            onTap: _loadMoreDeliveries,
+                            child: Text('Load More',
+                              style: BaycelTypography.bodySm.copyWith(
+                                color: BaycelColors.crimson, fontWeight: FontWeight.w600)),
+                          ),
+                  ),
                 ),
             ],
-          ),
-        );
-      },
-    );
+          );
   }
 
   Padding _buildTh(String text) {
@@ -324,6 +355,27 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         expectedQuantity: item.expectedQuantity,
         receivedQuantity: item.expectedQuantity,
       )).toList();
+
+      for (final item in updatedItems) {
+        if (item.receivedQuantity <= 0) continue;
+        final products = await _firestore.getProducts().first;
+        final product = products.where((p) => p.id == item.productId || p.name == item.productName).firstOrNull;
+        if (product != null) {
+          final newQty = product.stockQuantity + item.receivedQuantity;
+          await _firestore.updateProduct(product.id, {'stockQuantity': newQty});
+          await _firestore.addStockMovement(StockMovement(
+            id: '',
+            productId: product.id,
+            productName: product.name,
+            type: StockMovementType.stockIn,
+            quantity: item.receivedQuantity,
+            balanceAfter: newQty,
+            performedBy: FirebaseAuth.instance.currentUser?.uid ?? '',
+            createdAt: DateTime.now(),
+          ));
+        }
+      }
+
       await _firestore.updateDelivery(delivery.id, {
         'items': updatedItems.map((item) => item.toMap()).toList(),
         'status': 'delivered',

@@ -220,7 +220,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             : _buildInfoRow(Icons.person_outline, 'Full Name', user?.name ?? '—'),
           Divider(color: BaycelColors.divider.withValues(alpha: 0.5)),
           _buildInfoRow(Icons.badge_outlined, 'Role', _getRoleLabel(user?.role.value ?? 'cashier')),
-          if (isOwner) ...[
+          if (!isOwner) ...[
             Divider(color: BaycelColors.divider.withValues(alpha: 0.5)),
             _buildInfoRow(Icons.payments_outlined, 'Hourly Rate', '\u20B1${(user?.rate ?? 0).toStringAsFixed(0)}/hr'),
           ],

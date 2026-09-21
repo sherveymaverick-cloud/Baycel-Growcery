@@ -3,6 +3,7 @@ import '../theme.dart';
 import '../widgets/shared_widgets.dart';
 import '../widgets/animated_widgets.dart';
 import '../services/firestore_service.dart';
+import '../services/notification_service.dart';
 import '../models/payroll.dart';
 import '../models/user.dart';
 import '../models/absence_form.dart';
@@ -70,7 +71,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
       }
 
       int count = 0;
-      for (final user in users) {
+      for (final user in users.where((u) => u.role != UserRole.owner)) {
         final userRecords = attendance.where((r) =>
           r.employeeId == user.uid &&
           r.date.compareTo(periodStart) >= 0 &&
@@ -171,12 +172,13 @@ class _PayrollScreenState extends State<PayrollScreen> {
     }
   }
 
-  void _markAsPaid(String payrollId) async {
+  void _markAsPaid(String payrollId, PayrollRecord record) async {
     try {
       await _firestoreService.updatePayroll(payrollId, {
         'status': 'paid',
         'paidAt': DateTime.now(),
       });
+      await NotificationService.sendPayrollReady(record.employeeName, record.netPay, record.employeeId);
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Marked as paid')),
       );
@@ -471,7 +473,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
                   SizedBox(width: BaycelSpacing.sm),
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () => _markAsPaid(record.id),
+                      onPressed: () => _markAsPaid(record.id, record),
                       icon: Icon(Icons.check, size: 14, color: Colors.white),
                       label: Text('Mark Paid', style: TextStyle(color: Colors.white)),
                       style: BaycelComponents.buttonPrimary,
@@ -556,9 +558,27 @@ class _DeductionEditorDialogState extends State<_DeductionEditorDialog> {
   void _addDeduction() {
     final desc = _descController.text.trim();
     final amount = double.tryParse(_amountController.text) ?? 0;
-    if (desc.isEmpty || amount <= 0) {
+    if (desc.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Enter description and valid amount')),
+        SnackBar(content: Text('Enter a description'), backgroundColor: BaycelColors.error),
+      );
+      return;
+    }
+    if (desc.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Description must be at least 2 characters'), backgroundColor: BaycelColors.error),
+      );
+      return;
+    }
+    if (_amountController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Enter an amount'), backgroundColor: BaycelColors.error),
+      );
+      return;
+    }
+    if (amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Amount must be greater than 0'), backgroundColor: BaycelColors.error),
       );
       return;
     }
@@ -640,6 +660,7 @@ class _DeductionEditorDialogState extends State<_DeductionEditorDialog> {
               controller: _descController,
               decoration: BaycelComponents.input.copyWith(hintText: 'Description (e.g., SSS, PhilHealth, Cash Advance)'),
               style: BaycelTypography.body.copyWith(fontSize: 13),
+              maxLength: 100,
             ),
             SizedBox(height: BaycelSpacing.sm),
             TextField(
@@ -647,6 +668,7 @@ class _DeductionEditorDialogState extends State<_DeductionEditorDialog> {
               keyboardType: TextInputType.numberWithOptions(decimal: true),
               decoration: BaycelComponents.input.copyWith(hintText: 'Amount'),
               style: BaycelTypography.body.copyWith(fontSize: 13),
+              maxLength: 10,
             ),
             SizedBox(height: BaycelSpacing.sm),
             SizedBox(

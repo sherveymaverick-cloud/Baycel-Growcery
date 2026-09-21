@@ -15,6 +15,8 @@ class AttendanceScreen extends StatefulWidget {
 class _AttendanceScreenState extends State<AttendanceScreen> {
   DateTime _selectedDate = DateTime.now();
   final _firestore = FirestoreService();
+  int _visibleRows = 20;
+  static const int _pageSize = 20;
 
   String get _dateKey {
     final y = _selectedDate.year;
@@ -139,6 +141,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             final todayRecords =
                 allRecords.where((r) => r.date == _dateKey).toList();
 
+            final paginatedRecords = todayRecords.take(_visibleRows).toList();
+            final hasMore = todayRecords.length > _visibleRows;
+
             int presentCount = 0;
             int lateCount = 0;
             int absentCount = 0;
@@ -180,8 +185,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   SizedBox(height: BaycelSpacing.lg),
                   StaggeredItem(
                     index: 2,
-                    child: _buildAttendanceTable(todayRecords, userMap),
+                    child: _buildAttendanceTable(paginatedRecords, userMap),
                   ),
+                  if (hasMore)
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: BaycelSpacing.base),
+                      child: Center(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _visibleRows += _pageSize),
+                          child: Text('Load More',
+                            style: BaycelTypography.bodySm.copyWith(
+                              color: BaycelColors.crimson, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             );
@@ -241,6 +258,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
+        _visibleRows = _pageSize;
       });
     }
   }

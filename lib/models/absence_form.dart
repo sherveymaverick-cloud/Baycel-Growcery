@@ -30,6 +30,7 @@ class AbsenceForm {
   final AbsenceStatus status;
   final bool isPaidLeave;
   final String? managerNote;
+  final String? rejectionComment;
   final DateTime? submittedAt;
   final DateTime? reviewedAt;
 
@@ -43,6 +44,7 @@ class AbsenceForm {
     this.status = AbsenceStatus.pending,
     this.isPaidLeave = false,
     this.managerNote,
+    this.rejectionComment,
     this.submittedAt,
     this.reviewedAt,
   });
@@ -57,6 +59,7 @@ class AbsenceForm {
       'status': status.value,
       'isPaidLeave': isPaidLeave,
       'managerNote': managerNote,
+      'rejectionComment': rejectionComment,
       'submittedAt': submittedAt,
       'reviewedAt': reviewedAt,
     };
@@ -73,6 +76,7 @@ class AbsenceForm {
       status: AbsenceStatus.fromValue(map['status'] ?? 'pending'),
       isPaidLeave: map['isPaidLeave'] ?? false,
       managerNote: map['managerNote'],
+      rejectionComment: map['rejectionComment'],
       submittedAt: _toDate(map['submittedAt']),
       reviewedAt: _toDate(map['reviewedAt']),
     );

@@ -351,7 +351,7 @@ class SkeletonDashboard extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           crossAxisSpacing: BaycelSpacing.sm,
           mainAxisSpacing: BaycelSpacing.sm,
-          childAspectRatio: 1.5,
+          childAspectRatio: 2.0,
           children: List.generate(crossCount, (_) => const SkeletonCard()),
         );
       },
