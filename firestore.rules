@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isOwner() {
+      return signedIn() && userRole() == 'owner';
+    }
+
+    function isManager() {
+      return signedIn() && userRole() == 'manager';
+    }
+
+    function isAdmin() {
+      return isOwner() || isManager();
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create, delete: if isOwner();
+      allow update: if isOwner()
+        || (signedIn() && request.auth.uid == uid
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.role != 'owner');
+    }
+
+    match /products/{doc} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /stock_movements/{doc} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /deliveries/{doc} {
+      allow read: if signedIn();
+      allow write: if signedIn();
+    }
+
+    match /attendance/{doc} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if isAdmin()
+        || (signedIn()
+            && request.auth.uid == resource.data.employeeId
+            && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['timeOut', 'timeOut2', 'totalHours', 'status']));
+      allow delete: if isOwner();
+    }
+
+    match /absence_forms/{doc} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if isAdmin()
+        || (signedIn() && request.auth.uid == resource.data.employeeId
+            && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['rejectionComment']));
+      allow delete: if isOwner();
+    }
+
+    match /payrolls/{doc} {
+      allow read: if isOwner()
+        || (signedIn() && request.auth.uid == resource.data.employeeId);
+      allow create, update, delete: if isOwner();
+    }
+
+    match /deductible_templates/{doc} {
+      allow read: if signedIn();
+      allow write: if isOwner();
+    }
+
+    match /settings/{doc} {
+      allow read: if signedIn();
+      allow write: if isOwner();
+    }
+
+    match /cash_advances/{doc} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if isAdmin();
+      allow delete: if isOwner();
+    }
+
+    match /notifications/{doc} {
+      allow read, update, delete: if signedIn()
+        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if signedIn();
+    }
+  }
+}

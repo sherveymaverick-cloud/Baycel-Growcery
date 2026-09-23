@@ -7,6 +7,14 @@
         { "fieldPath": "employeeId", "order": "ASCENDING" },
         { "fieldPath": "date", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "payrolls",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "employeeId", "order": "ASCENDING" },
+        { "fieldPath": "periodEnd", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

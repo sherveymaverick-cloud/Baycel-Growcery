@@ -116,7 +116,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: SkeletonProfile());
+      return const SkeletonProfilePage();
     }
 
     final user = _user;

@@ -28,6 +28,11 @@ class BaycelColors {
   static const divider = Color(0xFFE0E0E0);
   static const success = Color(0xFF2E7D32);
   static const error = Color(0xFFBA1A1A);
+  static const warningText = Color(0xFFBF360C);
+
+  // Skeleton loader tokens
+  static const skeletonBase = Color(0xFFE0E0E0);
+  static const skeletonShimmer = Color(0xFFF5F5F5);
 
   // Data viz palette (stat icon tints, charts)
   static const viz1 = crimson; // products
@@ -219,25 +224,47 @@ class BaycelShadows {
 
 /// Component tokens (derived from design system)
 class BaycelComponents {
+  static const _stateAnim = Duration(milliseconds: 150);
+
   static final buttonPrimary = ButtonStyle(
-    backgroundColor: WidgetStatePropertyAll(BaycelColors.crimson),
-    foregroundColor: WidgetStatePropertyAll(Colors.white),
+    backgroundColor: WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.disabled)) return BaycelColors.textDisabled;
+      if (states.contains(WidgetState.pressed)) return const Color(0xFF750000);
+      if (states.contains(WidgetState.hovered)) return BaycelColors.crimsonDark;
+      return BaycelColors.crimson;
+    }),
+    foregroundColor: WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.disabled)) return Colors.white70;
+      return Colors.white;
+    }),
+    overlayColor: WidgetStatePropertyAll(Colors.white.withValues(alpha: 0.12)),
     padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
     shape: WidgetStatePropertyAll(RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(BaycelRadius.md),
     )),
     textStyle: WidgetStatePropertyAll(BaycelTypography.label),
+    animationDuration: _stateAnim,
   );
 
   static final buttonOutlined = ButtonStyle(
-    backgroundColor: WidgetStatePropertyAll(Colors.transparent),
-    foregroundColor: WidgetStatePropertyAll(BaycelColors.textPrimary),
+    backgroundColor: WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.disabled)) return Colors.transparent;
+      if (states.contains(WidgetState.pressed)) return BaycelColors.divider.withValues(alpha: 0.6);
+      if (states.contains(WidgetState.hovered)) return BaycelColors.divider.withValues(alpha: 0.35);
+      return Colors.transparent;
+    }),
+    foregroundColor: WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.disabled)) return BaycelColors.textDisabled;
+      return BaycelColors.textPrimary;
+    }),
+    overlayColor: WidgetStatePropertyAll(BaycelColors.crimson.withValues(alpha: 0.06)),
     padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
     shape: WidgetStatePropertyAll(RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(BaycelRadius.md),
       side: BorderSide(color: BaycelColors.divider),
     )),
     textStyle: WidgetStatePropertyAll(BaycelTypography.label),
+    animationDuration: _stateAnim,
   );
 
   static final card = BoxDecoration(
@@ -274,6 +301,17 @@ ThemeData buildBaycelTheme() {
     colorScheme: ColorScheme.fromSeed(
       seedColor: BaycelColors.crimson,
       brightness: Brightness.light,
+    ),
+    hoverColor: BaycelColors.crimson.withValues(alpha: 0.06),
+    highlightColor: BaycelColors.crimson.withValues(alpha: 0.10),
+    focusColor: BaycelColors.crimson.withValues(alpha: 0.08),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: BaycelColors.textPrimary,
+      contentTextStyle: BaycelTypography.bodySm.copyWith(color: Colors.white),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(BaycelRadius.md),
+      ),
     ),
     textTheme: TextTheme(
       displayLarge: BaycelTypography.display,

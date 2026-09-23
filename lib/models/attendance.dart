@@ -104,19 +104,20 @@ class AttendanceRecord {
   }
 
   factory AttendanceRecord.fromMap(String id, Map<String, dynamic> map) {
+    final statusRaw = map['status'];
     return AttendanceRecord(
       id: id,
-      employeeId: map['employeeId'] ?? '',
-      date: map['date'] ?? '',
-      timeIn: map['timeIn'] ?? '',
-      timeOut: map['timeOut'],
-      timeIn2: map['timeIn2'],
-      timeOut2: map['timeOut2'],
-      totalHours: (map['totalHours'] ?? 0).toDouble(),
-      lateMinutes: map['lateMinutes'] ?? 0,
-      undertimeMinutes: map['undertimeMinutes'] ?? 0,
-      overtimeHours: (map['overtimeHours'] ?? 0).toDouble(),
-      status: map['status'] != null ? AttendanceStatus.fromValue(map['status']) : null,
+      employeeId: map['employeeId'] as String? ?? '',
+      date: map['date'] as String? ?? '',
+      timeIn: map['timeIn'] as String? ?? '',
+      timeOut: map['timeOut'] as String?,
+      timeIn2: map['timeIn2'] as String?,
+      timeOut2: map['timeOut2'] as String?,
+      totalHours: (map['totalHours'] as num?)?.toDouble() ?? 0,
+      lateMinutes: (map['lateMinutes'] as num?)?.toInt() ?? 0,
+      undertimeMinutes: (map['undertimeMinutes'] as num?)?.toInt() ?? 0,
+      overtimeHours: (map['overtimeHours'] as num?)?.toDouble() ?? 0,
+      status: statusRaw is String ? AttendanceStatus.fromValue(statusRaw) : null,
     );
   }
 }

@@ -69,12 +69,24 @@ class WorkSchedule {
 }
 
 class StoreUser {
+  static const dayOffChoices = [
+    '',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+
   final String uid;
   final String name;
   final String email;
   final UserRole role;
   final double rate;
   final int payday;
+  final String dayOff;
   final WorkSchedule schedule;
   final String rfidCardUID;
   final List<String> assignedProducts;
@@ -88,6 +100,7 @@ class StoreUser {
     required this.role,
     required this.rate,
     this.payday = 7,
+    this.dayOff = '',
     required this.schedule,
     required this.rfidCardUID,
     required this.assignedProducts,
@@ -102,6 +115,7 @@ class StoreUser {
       'role': role.value,
       'rate': rate,
       'payday': payday,
+      'dayOff': dayOff,
       'schedule': schedule.toMap(),
       'rfidCardUID': rfidCardUID,
       'assignedProducts': assignedProducts,
@@ -111,16 +125,22 @@ class StoreUser {
   }
 
   factory StoreUser.fromMap(String uid, Map<String, dynamic> map) {
+    final rawAssigned = map['assignedProducts'];
     return StoreUser(
       uid: uid,
-      name: map['name'] ?? '',
-      email: map['email'] ?? '',
-      role: UserRoleX.fromValue(map['role'] ?? ''),
-      rate: (map['rate'] ?? 0).toDouble(),
-      payday: map['payday'] ?? 15,
-      schedule: WorkSchedule.fromMap(map['schedule'] ?? const {}),
-      rfidCardUID: map['rfidCardUID'] ?? '',
-      assignedProducts: List<String>.from(map['assignedProducts'] ?? []),
+      name: map['name'] as String? ?? '',
+      email: map['email'] as String? ?? '',
+      role: UserRoleX.fromValue(map['role'] as String? ?? ''),
+      rate: (map['rate'] as num?)?.toDouble() ?? 0,
+      payday: (map['payday'] as num?)?.toInt() ?? 15,
+      dayOff: map['dayOff'] as String? ?? '',
+      schedule: WorkSchedule.fromMap(
+        map['schedule'] is Map ? Map<String, dynamic>.from(map['schedule'] as Map) : const {},
+      ),
+      rfidCardUID: map['rfidCardUID'] as String? ?? '',
+      assignedProducts: rawAssigned is List
+          ? List<String>.from(rawAssigned.whereType<Object>().map((e) => e.toString()))
+          : <String>[],
       createdAt: _toDate(map['createdAt']),
       updatedAt: _toDate(map['updatedAt']),
     );

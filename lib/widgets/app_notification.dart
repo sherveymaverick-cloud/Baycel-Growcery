@@ -4,7 +4,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../theme.dart';
 
 class NotificationBell extends StatefulWidget {
-  const NotificationBell({super.key});
+  final void Function(String type)? onNavigate;
+  final bool onDark;
+
+  const NotificationBell({super.key, this.onNavigate, this.onDark = false});
 
   @override
   State<NotificationBell> createState() => _NotificationBellState();
@@ -102,6 +105,11 @@ class _NotificationBellState extends State<NotificationBell> {
                           _ => BaycelColors.textSecondary,
                         };
                         return ListTile(
+                          onTap: () {
+                            _markAsRead(n['id']);
+                            widget.onNavigate?.call(type);
+                            Navigator.pop(ctx);
+                          },
                           leading: Container(
                             width: 36, height: 36,
                             decoration: BoxDecoration(
@@ -154,19 +162,37 @@ class _NotificationBellState extends State<NotificationBell> {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
+<<<<<<< Updated upstream
           Icon(Icons.notifications_outlined, size: 22, color: BaycelColors.textSecondary),
           if (count > 0)
+=======
+          Icon(
+            Icons.notifications_outlined,
+            size: 22,
+            color: widget.onDark ? Colors.white : BaycelColors.textSecondary,
+          ),
+          if (_unreadCount > 0)
+>>>>>>> Stashed changes
             Positioned(
               top: -4, right: -4,
               child: Container(
                 padding: EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: BaycelColors.crimson,
+                  color: widget.onDark ? Colors.white : BaycelColors.crimson,
                   shape: BoxShape.circle,
                 ),
                 child: Text(
+<<<<<<< Updated upstream
                   count > 9 ? '9+' : '$count',
                   style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+=======
+                  _unreadCount > 9 ? '9+' : '$_unreadCount',
+                  style: TextStyle(
+                    color: widget.onDark ? BaycelColors.crimson : Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+>>>>>>> Stashed changes
                 ),
               ),
             ),

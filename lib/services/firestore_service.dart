@@ -10,6 +10,7 @@ import '../models/payroll.dart';
 import '../models/settings.dart';
 import 'notification_service.dart';
 import '../models/cash_advance.dart';
+import '../models/deductible_template.dart';
 
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -26,6 +27,7 @@ class FirestoreService {
   late final CollectionReference _payrolls = _firestore.collection('payrolls');
   late final CollectionReference _settings = _firestore.collection('settings');
   late final CollectionReference _cashAdvances = _firestore.collection('cash_advances');
+  late final CollectionReference _deductibleTemplates = _firestore.collection('deductible_templates');
 
   // ── Users ──────────────────────────────────────────
 
@@ -255,6 +257,13 @@ class FirestoreService {
             .toList());
   }
 
+  Future<List<AttendanceRecord>> getAllAttendance() async {
+    final snapshot = await _attendance.orderBy('date', descending: true).get();
+    return snapshot.docs
+        .map((doc) => AttendanceRecord.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<AttendanceRecord?> getLatestAttendance(String employeeId) async {
     final query = await _attendance
         .where('employeeId', isEqualTo: employeeId)
@@ -345,6 +354,47 @@ class FirestoreService {
         .map((snapshot) => snapshot.docs
             .map((doc) => PayrollRecord.fromMap(doc.id, doc.data() as Map<String, dynamic>))
             .toList());
+  }
+
+  Future<List<PayrollRecord>> getPayrollsOnce() async {
+    final snapshot = await _payrolls.orderBy('periodEnd', descending: true).get();
+    return snapshot.docs
+        .map((doc) => PayrollRecord.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+        .toList();
+  }
+
+  // ── Deductible Templates ────────────────────────────
+
+  Future<void> addDeductibleTemplate(DeductibleTemplate template) async {
+    try {
+      await _deductibleTemplates.add(template.toMap());
+    } catch (e) {
+      throw Exception('Failed to add deductible. Please try again.');
+    }
+  }
+
+  Future<void> deleteDeductibleTemplate(String id) async {
+    try {
+      await _deductibleTemplates.doc(id).delete();
+    } catch (e) {
+      throw Exception('Failed to delete deductible.');
+    }
+  }
+
+  Stream<List<DeductibleTemplate>> getDeductibleTemplates() {
+    return _deductibleTemplates
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => DeductibleTemplate.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+            .toList());
+  }
+
+  Future<List<DeductibleTemplate>> getDeductibleTemplatesOnce() async {
+    final snapshot = await _deductibleTemplates.orderBy('createdAt', descending: true).get();
+    return snapshot.docs
+        .map((doc) => DeductibleTemplate.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+        .toList();
   }
 
   // ── Settings ──────────────────────────────────────

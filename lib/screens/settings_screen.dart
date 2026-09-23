@@ -51,7 +51,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Center(child: SkeletonSettings());
+    if (_isLoading) return const SkeletonSettingsPage();
 
     final isMobile = MediaQuery.of(context).size.width < 600;
 

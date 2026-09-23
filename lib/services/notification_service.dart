@@ -31,7 +31,7 @@ class NotificationService {
         badge: true,
         sound: true,
       );
-      print('Web notification permission: ${settings.authorizationStatus}');
+      debugPrint('Web notification permission: ${settings.authorizationStatus}');
       
       final token = await _messaging.getToken();
       if (token != null) {
@@ -43,10 +43,10 @@ class NotificationService {
       });
       
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        print('Web foreground message: ${message.notification?.title}');
+        debugPrint('Web foreground message: ${message.notification?.title}');
       });
     } catch (e) {
-      print('Web notification init skipped: $e');
+      debugPrint('Web notification init skipped: $e');
     }
   }
 
@@ -71,7 +71,7 @@ class NotificationService {
       provisional: false,
       criticalAlert: true,
     );
-    print('Notification permission status: ${settings.authorizationStatus}');
+    debugPrint('Notification permission status: ${settings.authorizationStatus}');
   }
 
   Future<void> _initializeLocalNotifications() async {
@@ -91,7 +91,7 @@ class NotificationService {
     });
 
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print('Notification opened: ${message.notification?.title}');
+      debugPrint('Notification opened: ${message.notification?.title}');
     });
   }
 
@@ -157,6 +157,34 @@ class NotificationService {
     await _sendToUser(employeeId, 'Payroll Ready', 'Your payslip for ₱${netPay.toStringAsFixed(0)} is ready', 'payroll');
   }
 
+  static Future<void> sendCashAdvanceStatus(double amount, String status, String employeeId, {String? note}) async {
+    final approved = status == 'approved';
+    var body = 'Your cash advance request of ₱${amount.toStringAsFixed(0)} was ${approved ? 'approved' : 'rejected'}';
+    if (!approved && note != null && note.isNotEmpty) {
+      body += '. Reason: $note';
+    }
+    await _sendToUser(
+      employeeId,
+      approved ? 'Cash Advance Approved' : 'Cash Advance Rejected',
+      body,
+      'cash_advance',
+    );
+  }
+
+  static Future<void> sendAbsenceStatus(String status, String employeeId, {String? comment}) async {
+    final approved = status == 'approved';
+    var body = 'Your absence form was ${approved ? 'approved' : 'rejected'}';
+    if (!approved && comment != null && comment.isNotEmpty) {
+      body += '. Reason: $comment';
+    }
+    await _sendToUser(
+      employeeId,
+      approved ? 'Absence Approved' : 'Absence Rejected',
+      body,
+      'absence',
+    );
+  }
+
   static Future<void> _sendToUser(String userId, String title, String body, String type) async {
     try {
       await FirebaseFirestore.instance.collection('notifications').add({
@@ -168,14 +196,14 @@ class NotificationService {
         'read': false,
       });
     } catch (e) {
-      print('Failed to send notification: $e');
+      debugPrint('Failed to send notification: $e');
     }
   }
 }
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print('Background message: ${message.notification?.title}');
+  debugPrint('Background message: ${message.notification?.title}');
 }
 
 void setupBackgroundMessaging() {
