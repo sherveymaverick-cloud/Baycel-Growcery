@@ -16,8 +16,8 @@ class PayrollDeduction {
 
   factory PayrollDeduction.fromMap(Map<String, dynamic> map) {
     return PayrollDeduction(
-      description: map['description'] ?? '',
-      amount: (map['amount'] ?? 0).toDouble(),
+      description: map['description'] as String? ?? '',
+      amount: (map['amount'] as num?)?.toDouble() ?? 0,
     );
   }
 }
@@ -95,28 +95,32 @@ class PayrollRecord {
   }
 
   factory PayrollRecord.fromMap(String id, Map<String, dynamic> map) {
+    final rawDeductions = map['deductions'];
     return PayrollRecord(
       id: id,
-      employeeId: map['employeeId'] ?? '',
-      employeeName: map['employeeName'] ?? '',
-      role: map['role'] ?? '',
-      periodStart: map['periodStart'] ?? '',
-      periodEnd: map['periodEnd'] ?? '',
-      hourlyRate: (map['hourlyRate'] ?? 0).toDouble(),
-      totalHours: (map['totalHours'] ?? 0).toInt(),
-      overtimeHours: (map['overtimeHours'] ?? 0).toInt(),
-      basicPay: (map['basicPay'] ?? 0).toDouble(),
-      overtimePay: (map['overtimePay'] ?? 0).toDouble(),
-      totalGross: (map['totalGross'] ?? 0).toDouble(),
-      deductions: (map['deductions'] as List<dynamic>?)
-          ?.map((d) => PayrollDeduction.fromMap(d as Map<String, dynamic>))
-          .toList() ?? [],
-      totalDeductions: (map['totalDeductions'] ?? 0).toDouble(),
-      netPay: (map['netPay'] ?? 0).toDouble(),
-      paidLeaveDays: (map['paidLeaveDays'] ?? 0).toInt(),
-      unpaidLeaveDays: (map['unpaidLeaveDays'] ?? 0).toInt(),
-      status: map['status'] ?? 'pending',
-      ownerNotes: map['ownerNotes'],
+      employeeId: map['employeeId'] as String? ?? '',
+      employeeName: map['employeeName'] as String? ?? '',
+      role: map['role'] as String? ?? '',
+      periodStart: map['periodStart'] as String? ?? '',
+      periodEnd: map['periodEnd'] as String? ?? '',
+      hourlyRate: (map['hourlyRate'] as num?)?.toDouble() ?? 0,
+      totalHours: (map['totalHours'] as num?)?.toInt() ?? 0,
+      overtimeHours: (map['overtimeHours'] as num?)?.toInt() ?? 0,
+      basicPay: (map['basicPay'] as num?)?.toDouble() ?? 0,
+      overtimePay: (map['overtimePay'] as num?)?.toDouble() ?? 0,
+      totalGross: (map['totalGross'] as num?)?.toDouble() ?? 0,
+      deductions: rawDeductions is List
+          ? rawDeductions
+              .whereType<Map>()
+              .map((d) => PayrollDeduction.fromMap(Map<String, dynamic>.from(d)))
+              .toList()
+          : <PayrollDeduction>[],
+      totalDeductions: (map['totalDeductions'] as num?)?.toDouble() ?? 0,
+      netPay: (map['netPay'] as num?)?.toDouble() ?? 0,
+      paidLeaveDays: (map['paidLeaveDays'] as num?)?.toInt() ?? 0,
+      unpaidLeaveDays: (map['unpaidLeaveDays'] as num?)?.toInt() ?? 0,
+      status: map['status'] as String? ?? 'pending',
+      ownerNotes: map['ownerNotes'] as String?,
       paidAt: _toDate(map['paidAt']),
       createdAt: _toDate(map['createdAt']) ?? DateTime.now(),
     );

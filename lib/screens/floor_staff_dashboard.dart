@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:io';
 import '../theme.dart';
 import '../widgets/animated_widgets.dart';
+import '../widgets/shared_widgets.dart';
 import '../widgets/floor_staff_shared_widgets.dart';
 import '../services/firestore_service.dart';
 import '../models/delivery.dart';
@@ -15,11 +16,13 @@ import 'floor_staff/bagger_dashboard.dart';
 import 'floor_staff/bodegero_dashboard.dart';
 import 'floor_staff/delivery_checker_dashboard.dart';
 import 'floor_staff/merchandiser_dashboard.dart';
+import '../widgets/app_notification.dart';
 
 class FloorStaffDashboard extends StatefulWidget {
   final String role;
+  final void Function(String type)? onNavigate;
 
-  const FloorStaffDashboard({super.key, this.role = 'cashier'});
+  const FloorStaffDashboard({super.key, this.role = 'cashier', this.onNavigate});
 
   @override
   State<FloorStaffDashboard> createState() => _FloorStaffDashboardState();
@@ -28,6 +31,7 @@ class FloorStaffDashboard extends StatefulWidget {
 class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
   final _firestore = FirestoreService();
   String get _role => widget.role.toLowerCase();
+  bool _isLoaded = false;
   bool _isClockedIn = false;
   bool _isOnBreak = false;
   String _clockTime = '';
@@ -58,6 +62,7 @@ class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
         setState(() => _staffRole = _getRoleLabel());
       }
     }
+    if (mounted) setState(() => _isLoaded = true);
   }
 
   void _restoreClockInState() async {
@@ -399,6 +404,7 @@ class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_isLoaded) return const SkeletonFloorHomePage();
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -431,6 +437,11 @@ class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
   }
 
   Widget _buildAppBar() {
+    final now = DateTime.now();
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    final dateStr = '${days[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -452,6 +463,13 @@ class _FloorStaffDashboardState extends State<FloorStaffDashboard> {
               Icon(Icons.shopping_cart_outlined, color: Colors.white, size: 18),
               SizedBox(width: BaycelSpacing.sm),
               Text('Baycel Growcery', style: BaycelTypography.label.copyWith(color: Colors.white, fontSize: 13)),
+              Spacer(),
+              Text(
+                dateStr,
+                style: BaycelTypography.bodySm.copyWith(color: Colors.white.withValues(alpha: 0.9), fontSize: 11),
+              ),
+              SizedBox(width: BaycelSpacing.md),
+              NotificationBell(onNavigate: widget.onNavigate, onDark: true),
             ],
           ),
           SizedBox(height: BaycelSpacing.lg),

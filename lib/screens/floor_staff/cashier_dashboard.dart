@@ -11,6 +11,7 @@ import '../../models/stock_movement.dart';
 import '../../models/cash_advance.dart';
 import '../../models/absence_form.dart';
 import '../../models/attendance.dart';
+import '../../widgets/search_scope.dart';
 
 class CashierDashboard extends StatelessWidget {
   final FirestoreService firestore;
@@ -216,8 +217,14 @@ class _AbsenceRequestsCard extends StatelessWidget {
           );
         }
         final List<AbsenceForm> forms = snapshot.data ?? [];
-        final List<AbsenceForm> myForms = forms.where((AbsenceForm f) =>
-          f.employeeId == FirebaseAuth.instance.currentUser?.uid).take(5).toList();
+        final query = context.searchQuery;
+        var myForms = forms.where((AbsenceForm f) =>
+          f.employeeId == FirebaseAuth.instance.currentUser?.uid).toList();
+        if (query.isNotEmpty) {
+          myForms = myForms.where((f) =>
+              '${f.reason} ${f.status.value} ${f.startDate} ${f.endDate}'.toLowerCase().contains(query)).toList();
+        }
+        final visibleForms = myForms.take(query.isEmpty ? 5 : myForms.length).toList();
 
         return Container(
           padding: EdgeInsets.all(BaycelSpacing.base),
@@ -227,7 +234,7 @@ class _AbsenceRequestsCard extends StatelessWidget {
             children: [
               Text('My Absence Requests', style: BaycelTypography.title),
               SizedBox(height: BaycelSpacing.sm),
-              if (myForms.isEmpty)
+              if (visibleForms.isEmpty)
                 Center(child: Padding(
                   padding: EdgeInsets.symmetric(vertical: BaycelSpacing.lg),
                   child: Column(
@@ -235,12 +242,15 @@ class _AbsenceRequestsCard extends StatelessWidget {
                     children: [
                       Icon(Icons.event_busy, size: 32, color: BaycelColors.textDisabled),
                       SizedBox(height: BaycelSpacing.sm),
-                      Text('No requests yet', style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled)),
+                      Text(
+                        query.isEmpty ? 'No requests yet' : 'No absences match "$query"',
+                        style: BaycelTypography.bodySm.copyWith(color: BaycelColors.textDisabled),
+                      ),
                     ],
                   ),
                 ))
               else
-                ...myForms.map((f) {
+                ...visibleForms.map((f) {
                   final statusColor = f.status == AbsenceStatus.approved
                     ? BaycelColors.success
                     : f.status == AbsenceStatus.rejected

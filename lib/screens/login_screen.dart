@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../theme.dart';
+import '../navigation.dart';
 import '../widgets/animated_widgets.dart';
 import 'home_screen.dart';
 
@@ -28,7 +29,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (result != null && mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          BaycelPageRoute(page: const HomeScreen()),
           (route) => false,
         );
         return;
@@ -324,7 +325,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildLoginButton() {
     return PressScale(
-      onTap: _isLoading ? null : _validateAndLogin,
       child: SizedBox(width: double.infinity, height: 52, child: ElevatedButton(
         onPressed: _isLoading ? null : _validateAndLogin,
         style: BaycelComponents.buttonPrimary,

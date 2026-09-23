@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../widgets/animated_widgets.dart';
+import '../widgets/shared_widgets.dart';
 import '../services/firestore_service.dart';
 import '../services/pdf_service.dart';
 import '../models/product.dart';
@@ -8,6 +9,7 @@ import '../models/delivery.dart';
 import '../models/attendance.dart';
 import '../models/user.dart';
 import '../models/stock_movement.dart';
+import '../widgets/search_scope.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -19,6 +21,23 @@ class ReportsScreen extends StatefulWidget {
 class _ReportsScreenState extends State<ReportsScreen> {
   final _firestore = FirestoreService();
   String _salesPeriod = 'weekly';
+  bool _isOwner = false;
+  bool _roleLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRole();
+  }
+
+  void _loadRole() async {
+    final user = await _firestore.getCurrentUser();
+    if (!mounted) return;
+    setState(() {
+      _isOwner = user?.role == UserRole.owner;
+      _roleLoaded = true;
+    });
+  }
 
   List<_SalesBucket> _aggregateSales(List<StockMovement> movements, String period) {
     final now = DateTime.now();
@@ -95,6 +114,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_roleLoaded) {
+      return const SkeletonReportsPage();
+    }
     return SingleChildScrollView(
       padding: EdgeInsets.all(BaycelSpacing.lg),
       child: Column(
@@ -222,6 +244,60 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Widget _buildReportCards(BuildContext context) {
+    final query = context.searchQuery;
+    final cards = <_ReportSpec>[
+      _ReportSpec(
+        title: 'Sales Report',
+        description: 'Daily and weekly revenue and order volume, broken down by category.',
+        icon: Icons.assessment_rounded,
+        iconColor: BaycelColors.crimson,
+      ),
+      _ReportSpec(
+        title: 'Attendance Report',
+        description: 'Time-in/out records, lateness, undertime, and overtime by employee and role.',
+        icon: Icons.access_time_rounded,
+        iconColor: BaycelColors.viz5,
+      ),
+      if (_isOwner)
+        _ReportSpec(
+          title: 'Payroll Summary',
+          description: 'Gross pay, deductions, and net pay totals for any completed pay period.',
+          icon: Icons.receipt_long_rounded,
+          iconColor: BaycelColors.marigoldDark,
+        ),
+      _ReportSpec(
+        title: 'Employee Performance',
+        description: 'Attendance consistency and task completion, ranked by role.',
+        icon: Icons.people_rounded,
+        iconColor: BaycelColors.blue,
+      ),
+      _ReportSpec(
+        title: 'Inventory Report',
+        description: 'Stock levels and reorder alerts across every product category.',
+        icon: Icons.inventory_2_rounded,
+        iconColor: BaycelColors.viz4,
+      ),
+      _ReportSpec(
+        title: 'Delivery Report',
+        description: 'Supplier reliability, on-time rate, and discrepancy history by vendor.',
+        icon: Icons.local_shipping_rounded,
+        iconColor: BaycelColors.success,
+      ),
+    ];
+    final visible = query.isEmpty
+        ? cards
+        : cards.where((c) =>
+            '${c.title} ${c.description}'.toLowerCase().contains(query)).toList();
+    final visibleTitles = visible.map((c) => c.title).toSet();
+    if (query.isNotEmpty && visible.isEmpty) {
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: BaycelSpacing.xl),
+        child: Center(
+          child: Text('No reports match "$query"',
+            style: BaycelTypography.body.copyWith(color: BaycelColors.textMuted)),
+        ),
+      );
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         final crossCount = constraints.maxWidth > 900 ? 3 : constraints.maxWidth > 600 ? 2 : 1;
@@ -233,6 +309,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           childAspectRatio: 1.8,
           physics: const NeverScrollableScrollPhysics(),
           children: [
+            if (visibleTitles.contains('Sales Report'))
             _StreamReportCard<StockMovement>(
               title: 'Sales Report',
               description: 'Daily and weekly revenue and order volume, broken down by category.',
@@ -271,6 +348,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 );
               },
             ),
+            if (visibleTitles.contains('Attendance Report'))
             _StreamReportCard<AttendanceRecord>(
               title: 'Attendance Report',
               description: 'Time-in/out records, lateness, undertime, and overtime by employee and role.',
@@ -305,12 +383,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 );
               },
             ),
+            if (_isOwner && visibleTitles.contains('Payroll Summary'))
             _StreamReportCard<StoreUser>(
               title: 'Payroll Summary',
               description: 'Gross pay, deductions, and net pay totals for any completed pay period.',
               icon: Icons.receipt_long_rounded,
               iconColor: BaycelColors.marigoldDark,
-              stream: _firestore.getUsers(),
+              stream: _firestore.getUsers().map(
+                    (users) => users
+                        .where((u) =>
+                            u.role != UserRole.owner &&
+                            u.role != UserRole.merchandiser)
+                        .toList(),
+                  ),
               builder: (context, users) {
                 return _ReportCard(
                   title: 'Payroll Summary',
@@ -322,7 +407,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     'Roles': users.map((u) => u.role.value).toSet().length.toString(),
                   },
                   onGenerate: () async {
-                    final payrolls = await _firestore.getPayrolls().first;
+                    final payrolls = (await _firestore.getPayrollsOnce())
+                        .where((p) => p.role != 'merchandiser')
+                        .toList();
                     if (context.mounted) {
                       PdfService.generatePayrollReport(
                         payrolls: payrolls,
@@ -334,6 +421,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 );
               },
             ),
+            if (visibleTitles.contains('Employee Performance'))
             _StreamReportCard<StoreUser>(
               title: 'Employee Performance',
               description: 'Attendance consistency and task completion, ranked by role.',
@@ -362,6 +450,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 );
               },
             ),
+            if (visibleTitles.contains('Inventory Report'))
             _StreamReportCard<Product>(
               title: 'Inventory Report',
               description: 'Stock levels and reorder alerts across every product category.',
@@ -391,6 +480,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 );
               },
             ),
+            if (visibleTitles.contains('Delivery Report'))
             _StreamReportCard<Delivery>(
               title: 'Delivery Report',
               description: 'Supplier reliability, on-time rate, and discrepancy history by vendor.',
@@ -423,6 +513,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
       },
     );
   }
+}
+
+class _ReportSpec {
+  final String title;
+  final String description;
+  final IconData icon;
+  final Color iconColor;
+  const _ReportSpec({
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.iconColor,
+  });
 }
 
 class _ReportCard extends StatelessWidget {
